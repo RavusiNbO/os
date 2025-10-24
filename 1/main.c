@@ -12,15 +12,52 @@
 #include <unistd.h>
 #include "stdbool.h"
 int child_pid;
+int childs[20];
+
+
+void print_childs(){
+	for (int i = 0; i < sizeof(childs); ++i){
+			printf("%d", childs[i]);
+	}
+}
+int kill_ChildProc(int pid){
+	kill(pid, SIGSTOP);
+	for (int i = 0; i < sizeof(childs); ++i)
+	{
+		if (pid == childs[i])
+		{
+			childs[i] = 0;
+			break;
+		}
+	}
+}
+
+int find_free(){
+	for (int i = 0; i < sizeof(childs); ++i)
+	{
+		if (childs[i] == 0)
+		{
+			return i;
+		}
+	}
+}
 
 void handler(int sig)
 {
-    kill(child_pid, SIGSTOP);
+	if (child_pid)
+	{
+    	kill(child_pid, SIGKILL);
+		child_pid = 0;
+	}
+	else{
+		exit(0);
+	}
 }
 
 int react(char* command[]){
     
     child_pid = fork();
+	childs[find_free()] = child_pid;
     if (child_pid == 0)
     {
         execvp(command[0], command);
@@ -31,6 +68,7 @@ int react(char* command[]){
         perror("waitpid");
         return -1;
     }
+	child_pid = 0;
 
     return 0;
 }
@@ -55,10 +93,21 @@ int main(){
         }
         count = i;
         command[i] = NULL;
-        
+        if (command[0] == "exit")
+		{
+			kill_ChildProc(atoi(command[1]));
+			goto free;
+		}
+		else if (command[0] == "print")
+		{
+			print_childs();	
+		}
 
         if (react(command)) exit(1);
-        for (j = 0; j < i; j++) {
+        
+		free:
+
+		for (j = 0; j < i; j++) {
             free(command[j]);
         }
     }
