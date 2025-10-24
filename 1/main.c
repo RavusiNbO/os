@@ -11,18 +11,22 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include "stdbool.h"
+#define MAX_CHILDS 20
+
+
 int child_pid;
-int childs[20];
+int childs[MAX_CHILDS];
 
 
 void print_childs(){
-	for (int i = 0; i < sizeof(childs); ++i){
-			printf("%d", childs[i]);
+	for (int i = 0; i < MAX_CHILDS; ++i){
+			printf("%d  ", childs[i]);
 	}
+	printf("\n");
 }
 int kill_ChildProc(int pid){
 	kill(pid, SIGSTOP);
-	for (int i = 0; i < sizeof(childs); ++i)
+	for (int i = 0; i < MAX_CHILDS; ++i)
 	{
 		if (pid == childs[i])
 		{
@@ -33,7 +37,7 @@ int kill_ChildProc(int pid){
 }
 
 int find_free(){
-	for (int i = 0; i < sizeof(childs); ++i)
+	for (int i = 0; i < MAX_CHILDS; ++i)
 	{
 		if (childs[i] == 0)
 		{
@@ -93,12 +97,12 @@ int main(){
         }
         count = i;
         command[i] = NULL;
-        if (command[0] == "exit")
+        if (strcmp(command[0], "exit") == 0)
 		{
 			kill_ChildProc(atoi(command[1]));
 			goto free;
 		}
-		else if (command[0] == "print")
+		else if (strcmp(command[0], "print") == 0)
 		{
 			print_childs();	
 		}
