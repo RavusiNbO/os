@@ -10,7 +10,7 @@
 #include <string.h>
 #include <sys/wait.h>
 #include <unistd.h>
-
+#include "stdbool.h"
 int child_pid;
 
 void handler(int sig)
