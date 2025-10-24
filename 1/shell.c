@@ -25,7 +25,7 @@ void print_childs(){
 	printf("\n");
 }
 int kill_ChildProc(int pid){
-	kill(pid, SIGSTOP);
+	kill(pid, SIGKILL);
 	for (int i = 0; i < MAX_CHILDS; ++i)
 	{
 		if (pid == childs[i])
@@ -61,13 +61,13 @@ void handler(int sig)
 int react(char* command[]){
     
     child_pid = fork();
-	childs[find_free()] = child_pid;
     if (child_pid == 0)
-    {
-        execvp(command[0], command);
+    {  
+		execvp(command[0], command);
         perror("execvp");
         exit(1);
     }
+	childs[find_free()] = child_pid;
     if (waitpid(child_pid, NULL, 0) < 0) {
         perror("waitpid");
         return -1;
@@ -104,7 +104,8 @@ int main(){
 		}
 		else if (strcmp(command[0], "print") == 0)
 		{
-			print_childs();	
+			print_childs();
+			goto free;
 		}
 
         if (react(command)) exit(1);
