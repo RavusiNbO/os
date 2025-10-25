@@ -24,6 +24,7 @@ void print_childs(){
 	}
 	printf("\n");
 }
+
 int kill_ChildProc(int pid){
 	kill(pid, SIGKILL);
 	for (int i = 0; i < MAX_CHILDS; ++i)
@@ -68,13 +69,25 @@ int react(char* command[]){
         exit(1);
     }
 	childs[find_free()] = child_pid;
-    if (waitpid(child_pid, NULL, 0) < 0) {
-        perror("waitpid");
-        return -1;
-    }
-	child_pid = 0;
 
     return 0;
+}
+
+void SIGCHLD_handler(int sig) {
+    int status;
+    while (1) {
+        int res = waitpid(-1, &status, WNOHANG);
+        if (res > 0) {
+            for (int i = 0; i < MAX_CHILDS; i++) {
+                if (childs[i] == res) {
+                    childs[i] = 0;
+                    break;
+                }
+            }
+        } else {
+            break;
+        }
+    }
 }
 
 int main(){
@@ -83,6 +96,7 @@ int main(){
     char* token;
     size_t i=0, j, count;
     signal(SIGINT, handler);
+	signal(SIGCHLD, SIGCHLD_handler);
 
     while (true)
     {
@@ -116,11 +130,6 @@ int main(){
             free(command[j]);
         }
     }
-
-
-
-
-
 
 }
 
