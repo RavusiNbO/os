@@ -1,13 +1,12 @@
-#define STB_IMAGE_IMPLEMENTATION
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "stb_image.h"
-#include "stb_image_write.h"
 #include <stdio.h>
 #include <time.h>
 #include <math.h>
 #include "pthread.h"
-
-#define THREADS 4
+#define STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image.h"
+#include "stb_image_write.h"
+#define THREADS 32
 
 struct thread_params {
     unsigned char* gray;
@@ -63,7 +62,6 @@ int main() {
     unsigned char* result = (unsigned char*) calloc(width * height, sizeof(unsigned char));
 
     struct thread_params params[THREADS];
-    clock_gettime(CLOCK_MONOTONIC, &start);
     for (i = 0; i < THREADS; ++i) {
         params[i].gray = img;
         params[i].result = result;
@@ -77,6 +75,7 @@ int main() {
             return 1;
         }
     }
+    clock_gettime(CLOCK_MONOTONIC, &start);
     
     for (i = 0; i < THREADS; ++i) {
         pthread_join(threads[i], NULL);
@@ -84,8 +83,8 @@ int main() {
     clock_gettime(CLOCK_MONOTONIC, &end);
     double seconds = (end.tv_sec - start.tv_sec) +
                  (end.tv_nsec - start.tv_nsec) / 1e9;
-    printf("Time: %f seconds\n", seconds);
-
+    printf("%f\n", seconds);
+	
 
     stbi_write_png("output_cat_mt.png", width, height, 1, result, width);
 
