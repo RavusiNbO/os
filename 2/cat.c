@@ -7,8 +7,9 @@
 int main(int argc, char** argv)
 {
     char buf[BUF_SIZE];
-    int fd = open(argv[1], O_RDONLY);
-    while(read(fd, buf, BUF_SIZE))
+    int bytes;
+	int fd = open(argv[1], O_RDONLY);
+    while((bytes = read(fd, buf, BUF_SIZE)) > 0)
     {
         write(STDOUT_FILENO, buf, BUF_SIZE);
     }
