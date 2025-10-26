@@ -35,6 +35,7 @@ int kill_ChildProc(int pid){
 			break;
 		}
 	}
+	child_pid = 0;
 }
 
 int find_free(){
@@ -65,8 +66,13 @@ int react(char* command[]){
     char path[256];
     if (child_pid == 0)
     {  
-		execv(snprintf(path, sizeof(path), "/usr/local/bin/%s", command[0]), command);
-        perror("execvp");
+		snprintf(path, sizeof(path), "/usr/local/bin/%s", command[0]);
+		execv(path, command);
+		if (strcmp(command[0], "konqueror") == 0)
+		{
+			execvp(command[0], command);
+		}
+        perror("execv");
         exit(1);
     }
 	childs[find_free()] = child_pid;
