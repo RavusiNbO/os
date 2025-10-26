@@ -66,10 +66,8 @@ int react(char* command[]){
     if (child_pid == 0)
     {  
 		snprintf(path, sizeof(path), "/usr/local/bin/%s", command[0]);
-		if (execv(path, command))
-		{
-			execvp(command[0], command);
-		}
+		execv(path, command);
+		execvp(command[0], command);
         perror("execv");
         exit(1);
     }
