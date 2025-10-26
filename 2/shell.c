@@ -52,8 +52,7 @@ void handler(int sig)
 {
 	if (child_pid)
 	{
-    	kill(child_pid, SIGKILL);
-		child_pid = 0;
+		kill_ChildProc(child_pid);
 	}
 	else{
 		exit(0);
@@ -67,8 +66,7 @@ int react(char* command[]){
     if (child_pid == 0)
     {  
 		snprintf(path, sizeof(path), "/usr/local/bin/%s", command[0]);
-		execv(path, command);
-		if (strcmp(command[0], "konqueror") == 0)
+		if (execv(path, command))
 		{
 			execvp(command[0], command);
 		}
@@ -87,7 +85,8 @@ void SIGCHLD_handler(int sig) {
         if (res > 0) {
             for (int i = 0; i < MAX_CHILDS; i++) {
                 if (childs[i] == res) {
-                    childs[i] = 0;
+                    if (child_pid == res) child_pid = 0;
+					childs[i] = 0;
                     break;
                 }
             }

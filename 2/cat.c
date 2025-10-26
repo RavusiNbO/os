@@ -11,7 +11,7 @@ int main(int argc, char** argv)
 	int fd = open(argv[1], O_RDONLY);
     while((bytes = read(fd, buf, BUF_SIZE)) > 0)
     {
-        write(STDOUT_FILENO, buf, BUF_SIZE);
+        write(STDOUT_FILENO, buf, bytes);
     }
     close(fd);
 
