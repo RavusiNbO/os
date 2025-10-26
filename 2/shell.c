@@ -72,6 +72,8 @@ int react(char* command[]){
         exit(1);
     }
 	childs[find_free()] = child_pid;
+	if (strcmp("bash", command[0])) waitpid(child_pid, NULL, 0);
+
 
     return 0;
 }
