@@ -177,6 +177,32 @@ struct tree* build_tree(struct tree *arr, unsigned *frequencies, size_t size)
     return arr;
 }
 
+bool search_tree(struct tree* head, unsigned target, uint8_t *encoded, unsigned *index)
+{
+    size_t zeros = 0, ones = 0;
+
+    
+    if (head->data == target)
+    {
+        return true;
+    }
+    if (head->zeroptr)
+    {
+        encoded[*index++] = 0;
+        if (!search_tree(head->zeroptr, target, encoded, index) && head->oneptr)
+        {
+            encoded[--*index] = 1;
+            if (!search_tree(head->oneptr, target, encoded, index))
+            {
+                return false;
+            }
+            else return true;
+        }
+        else return true;
+    }
+    
+}
+
 void length_to_code(unsigned length, uint16_t *code, uint16_t *base, uint8_t *extra) {
     static const uint16_t bases[] = {
       3,4,5,6,7,8,9,10,11,13,15,17,19,23,27,31,
@@ -229,6 +255,7 @@ struct rangedData* to_range(const struct match *matches, size_t size, size_t *ou
     struct rangedData* arr = malloc(size * 2 * sizeof(struct rangedData));
     size_t k = 0;
 
+
     for (size_t i = 0; i < size; i++) {
         if (matches[i].type == LITERAL) {
             arr[k].isLL = true;
@@ -269,7 +296,29 @@ void count_frequencies(struct rangedData* data, unsigned* LLfreq, unsigned* Ofre
     }
 }
 
-void encode();
+void encode_range_data(struct rangedData* data, size_t size, uint8_t *buffer, struct tree *headLL, struct tree *headO)
+{
+    uint16_t buff; // в нем буду сжимать биты 
+    unsigned index;
+    uint8_t encoded[288];
+
+
+
+    for (size_t i = 0 ; i < size; i++)
+    {
+        index = 0;
+        if (data[i].isLL && search_tree(headLL, data[i].haffCode, encoded, &index))
+        {
+
+        }
+        else if (search_tree(headO, data[i].haffCode, encoded, index)){
+
+        }
+    }
+
+
+
+}
 
 
 
@@ -282,13 +331,16 @@ int main()
     unsigned char filename[256];
     FILE* file;
     char c;
-    size_t i, sizeMatches, sizeData;
+    size_t i, sizeMatches = 0, sizeData = 0;
     unsigned char* buff = malloc(1024*1024);
     struct match *matches;
     unsigned *LLfrequencies, *Ofrequencies;
     char path[512];
     struct rangedData* encodedData;
     struct rangedData* rangedData;
+    struct tree *arrLL, *arrO, *headLL, *headO;
+    uint8_t *buffer;
+
     
     scanf("%255s", filename);
 
@@ -314,10 +366,17 @@ int main()
         Ofrequencies = malloc(30 * sizeof(unsigned));
         rangedData = calloc(sizeMatches, sizeof(struct rangedData));
         sizeData = 0;
-
+        
 
         to_range(matches, sizeMatches, &sizeData);
         count_frequencies(rangedData, LLfrequencies, Ofrequencies, sizeData);
+        headLL = build_tree(arrLL, LLfrequencies, 288);
+        headO = build_tree(arrO, Ofrequencies, 30);
+
+        buffer = calloc(sizeMatches, sizeof(struct rangedData));
+
+
+
 
     }
 
