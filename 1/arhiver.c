@@ -577,7 +577,7 @@ int main()
     int c;
     size_t i, sizeMatches = 0, sizeData = 0, sizeFile = 0, 
     blocksNumber = 0, blockCounter = 0, currentBlockSize = 0, 
-    lastBlockSize = 0, shorted_count;
+    lastBlockSize = 0, shorted_count, start, to_copy;
     unsigned char* buff = malloc(1024*1024);
     struct match *matches;
     unsigned *LLfrequencies, *Ofrequencies, *treesFrequencies, *lengthsFrequencies, 
@@ -643,10 +643,11 @@ int main()
                 end = true;
                 currentBlockSize = lastBlockSize;
             }
-            for (size_t j = 0; j < currentBlockSize; j++)
-            {
-                rangedBlock[j] = rangedData[j + currentBlockSize * (blockCounter - 1)];
-            }
+            start = (blockCounter - 1) * BLOCK_SIZE;
+            to_copy = (start + BLOCK_SIZE <= sizeData) ? BLOCK_SIZE : (sizeData - start);
+            for (size_t j = 0; j < to_copy; ++j) rangedBlock[j] = rangedData[start + j];
+            currentBlockSize = to_copy;
+
             buffer = malloc(currentBlockSize * 2 + 32);
             printf("block readed, size = %d\n", currentBlockSize);
 
