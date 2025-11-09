@@ -1,0 +1,9 @@
+WARP.md
+*.png
+*.jpg
+*.jpeg
+*_arhived
+archiver
+отчеты
+.vscode/
+results*

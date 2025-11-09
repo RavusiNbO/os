@@ -1,65 +1,4 @@
-#include "stdio.h"
-#include <sys/types.h>
-#include "unistd.h"
-#include "stdlib.h"
-#include "dirent.h"
-#include "stdint.h"
-#include "stdbool.h"
-#include "string.h"
-#define FILE_SIZE 4096
-#define BLOCK_SIZE 256
-#define WINDOW_SIZE 32*1024
-#define MIN_MATCH 3
-#define MAX_MATCH 258
-#define MAX_BITS 15
-#define LENGTHS_SIZE 19
-#define HLIT 31
-#define HDIST 29
-#define HCLEN 15
-
-
-
-typedef enum {LITERAL, MATCH} tok_type;
-
-struct bitWriter{
-    uint8_t buff;
-    uint8_t pos;
-    size_t buffPos;
-};
-
-struct rangedData{
-    bool isLL;
-    uint16_t haffCode;
-    uint8_t haffLen;
-    uint8_t extraVal;
-    uint8_t extraLen;
-};
-
-struct shortedLength{
-    unsigned data;
-    unsigned short extra_bits;
-};
-
-
-struct match{
-    tok_type type;
-    uint offset;
-    uint length;
-    unsigned char literal;
-};
-
-struct tree{
-    uint16_t symbol;
-    uint16_t data;
-    struct tree* zeroptr;
-    struct tree* oneptr;
-};
-
-struct Block{
-    unsigned end_flag;
-    unsigned encoding_type;
-    uint32_t data;
-};
+#include "archiver.h"
 
 
 void makeCanonicalCodes(
@@ -196,7 +135,7 @@ struct tree* merge(struct tree* smallest, struct tree* small) {
 }
 
 void refreshArr(struct tree*** arr, unsigned indSmallest, unsigned indSmall, struct tree *newNode, size_t *size) {
-    struct tree** newArr = calloc(*size - 1, sizeof(struct tree*));
+    struct tree** newArr = calloc(*size, sizeof(struct tree*));
     if (!newArr) return;
     
     size_t j = 0;
@@ -211,25 +150,33 @@ void refreshArr(struct tree*** arr, unsigned indSmallest, unsigned indSmall, str
 }
 
 struct tree* build_tree(unsigned *frequencies, size_t size) {
-    struct tree **arr = calloc(size, sizeof(struct tree*));
-    if (!arr) return NULL;
-    
     unsigned indSmallest, indSmall;
+    size_t nonzero = 0;
 
-    for (size_t i = 0; i < size; i++) {
-        arr[i] = malloc(sizeof(struct tree));
-        if (!arr[i]) {
-            for (size_t j = 0; j < i; j++) free(arr[j]);
-            free(arr);
-            return NULL;
-        }
-        arr[i]->data = frequencies[i];
-        arr[i]->symbol = i; 
-        arr[i]->zeroptr = NULL;
-        arr[i]->oneptr = NULL;
+    for (size_t i = 0; i < size; i++)
+        if (frequencies[i]) nonzero++;
+
+    if (nonzero == 0) {
+        struct tree *t = malloc(sizeof(struct tree));
+        t->data = 1;
+        t->symbol = 0;
+        t->zeroptr = t->oneptr = NULL;
+        return t;
     }
 
-    size_t current_size = size;
+    struct tree **arr = calloc(nonzero, sizeof(*arr));
+    size_t idx = 0;
+    for (size_t i = 0; i < size; i++) {
+        if (!frequencies[i]) continue;
+        arr[idx] = malloc(sizeof(struct tree));
+        arr[idx]->data = frequencies[i];
+        arr[idx]->symbol = i;
+        arr[idx]->zeroptr = arr[idx]->oneptr = NULL;
+        idx++;
+    }
+
+    size_t current_size = nonzero; 
+
     while (current_size > 1) {
         find_smallest_pair(arr, &indSmallest, &indSmall, current_size);
         struct tree *newNode = merge(arr[indSmallest], arr[indSmall]);
@@ -246,6 +193,7 @@ struct tree* build_tree(unsigned *frequencies, size_t size) {
     free(arr);
     return root;
 }
+
 
 bool find_code_in_tree(struct tree* node, uint16_t target, uint16_t code, unsigned depth, uint16_t *out_code, unsigned *out_len) {
     if (!node) return false;
@@ -441,7 +389,8 @@ void tree_bypass(struct tree* head, unsigned *frequencies, unsigned *len, unsign
     {
         frequencies[*len]++;
         if (*len > *maxlen) *maxlen = *len;
-        lengths[(*pos)++] = *len;
+        if (head->zeroptr || head->oneptr) return; // не записывать для внутренних узлов
+        lengths[head->symbol] = *len;
         return;
     }
     if (head->zeroptr)
@@ -461,19 +410,20 @@ void tree_bypass(struct tree* head, unsigned *frequencies, unsigned *len, unsign
 // нахожу длины каждого кода
 void getLenghtsCodeLengths(unsigned *lengths, struct tree* head, size_t length)
 {
+    if (!head) return;
+
+    if (!head->zeroptr && !head->oneptr) {
+        if (head->symbol < 19)
+            lengths[head->symbol] = length;
+        return;
+    }
+
     if (head->zeroptr)
-    {
         getLenghtsCodeLengths(lengths, head->zeroptr, length + 1);
-    }
     if (head->oneptr)
-    {
         getLenghtsCodeLengths(lengths, head->oneptr, length + 1);
-    }
-    if (!(head->oneptr && head->zeroptr))
-    {
-        lengths[head->symbol] = length;
-    }
 }
+
 
 void delete_tree(struct tree* head) {
     if (!head) return;
@@ -490,9 +440,15 @@ void delete_tree(struct tree* head) {
 
 void count_code_length(unsigned *frequencies, struct tree *headLL, struct tree *headO, unsigned *maxlen, unsigned *lengths, unsigned *pos)
 {
-    unsigned len = 0;
-    tree_bypass(headLL, frequencies, &len, maxlen, lengths, pos);
-    tree_bypass(headO, frequencies, &len, maxlen, lengths, pos);
+    unsigned ll_lengths[288] = {0};
+    unsigned o_lengths[30] = {0};
+
+    getLenghtsCodeLengths(ll_lengths, headLL, 0);
+    getLenghtsCodeLengths(o_lengths, headO, 0);
+
+    memcpy(lengths, ll_lengths, 288 * sizeof(unsigned));
+    memcpy(lengths + 288, o_lengths, 30 * sizeof(unsigned));
+
 }
 
 void repeats_compression(unsigned *lengths, struct shortedLength *shorted, size_t size, size_t *shorted_count)
@@ -541,18 +497,12 @@ void repeats_compression(unsigned *lengths, struct shortedLength *shorted, size_
 
 void write_header(struct bitWriter *writer, uint8_t *buff, bool end)
 {
-    unsigned hclen= HCLEN;
-    unsigned hlit = HLIT;
-    unsigned hdist = HDIST;
     unsigned coding = 0b10;
-    size_t sizeLen = hclen / 2 + hclen % 2;
-    size_t sizeDist = hdist / 2 + hdist % 2;
-    size_t sizeLit = hlit / 2 + hlit % 2;
     write_bits(writer, (int)end, 1, buff, 0, 0);
     write_bits(writer, coding, 2, buff, 0, 0);
-    write_bits(writer, hlit, sizeLit, buff, 0, 0);
-    write_bits(writer, hdist, sizeDist, buff, 0, 0);
-    write_bits(writer, hclen, sizeLen, buff, 0, 0);
+    write_bits(writer, HLIT, 5, buff, 0, 0);
+    write_bits(writer, HDIST, 5, buff, 0, 0);
+    write_bits(writer, HCLEN, 4, buff, 0, 0);
 }
 
 void write_lengths_of_lengths(uint16_t *codes, unsigned *lengths, struct bitWriter *writer, uint8_t *buffer)
@@ -565,14 +515,10 @@ void write_lengths_of_lengths(uint16_t *codes, unsigned *lengths, struct bitWrit
     }
 }
 
-
-
-
-int main()
+void compress_directory(unsigned char filename[256])
 {
     DIR* dir;
     struct dirent* entry;
-    unsigned char filename[256];
     FILE* file, *ofile;
     int c;
     size_t i, sizeMatches = 0, sizeData = 0, sizeFile = 0, 
@@ -583,8 +529,8 @@ int main()
     unsigned *LLfrequencies, *Ofrequencies, *treesFrequencies, *lengthsFrequencies, 
     *lengths, *codeLengths, maxlen = 0, pos = 0, len = 0,lenLen = 0, lengthsPos = 0,
     *treesFreq, maxlen2 = 0, pos2 = 0;
-    char path[512];
-    struct rangedData* rangedData, rangedBlock[BLOCK_SIZE];
+    unsigned char path[256];
+    struct rangedData* rangedData, *rangedBlock;
     struct tree *headLL, *headO, *headTrees;
     uint8_t *buffer, *trees;
     struct shortedLength *shortedLengths;
@@ -593,11 +539,6 @@ int main()
 
     unsigned codeLenFreq[MAX_BITS+1] = {0};
     unsigned lengthsOfLengths[19] = {0};
-
-
-
-    scanf("%255s", filename);
-
 
     dir = opendir(filename);
     struct bitWriter writer = {0, 0, 0};
@@ -608,6 +549,11 @@ int main()
 
         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) continue;
         snprintf(path, sizeof(path), "%s/%s", filename, entry->d_name);
+        if (entry->d_type == DT_DIR) 
+        {
+            compress_directory(path);
+            continue;
+        }
         file = fopen(path, "rb");
         if (!file) continue;
 
@@ -637,7 +583,7 @@ int main()
         while(!end)
         {
             currentBlockSize = BLOCK_SIZE;
-            printf("reading block №: %d\n", ++blockCounter);
+            printf("reading block №: %d of %s\n", ++blockCounter, path);
             if (blockCounter == blocksNumber) 
             {
                 end = true;
@@ -645,10 +591,12 @@ int main()
             }
             start = (blockCounter - 1) * BLOCK_SIZE;
             to_copy = (start + BLOCK_SIZE <= sizeData) ? BLOCK_SIZE : (sizeData - start);
-            for (size_t j = 0; j < to_copy; ++j) rangedBlock[j] = rangedData[start + j];
             currentBlockSize = to_copy;
+            rangedBlock = malloc(currentBlockSize * sizeof(struct rangedData));
+            for (size_t j = 0; j < to_copy; ++j) rangedBlock[j] = rangedData[start + j];
+            
 
-            buffer = malloc(currentBlockSize * 2 + 32);
+            buffer = malloc(currentBlockSize * 200);
             printf("block readed, size = %d\n", currentBlockSize);
 
 
@@ -675,28 +623,35 @@ int main()
             
             codes = calloc(318 , sizeof(uint16_t));
 
+
+
             printf("making canonical codes\n");
             makeCanonicalCodes(codeLengths, 318, codes);
 
             
 
             treesFreq = calloc(19, sizeof(unsigned));
-            count_frequencies_for_lengths(shortedLengths, treesFreq, 318);
+            count_frequencies_for_lengths(shortedLengths, treesFreq, shorted_count);
             headTrees = build_tree(treesFreq, 19);
 
             printf("length tree builded\n");
 
+            memset(lengthsOfLengths, 0, sizeof(lengthsOfLengths));
             getLenghtsCodeLengths(lengthsOfLengths, headTrees, 0);
+
+
 
             tree_codes = calloc(318 , sizeof(uint16_t));
 
             printf("making canonical trees codes\n");
             makeCanonicalCodes(lengthsOfLengths, 19, tree_codes);
+            
+            
 
             write_header(&writer, buffer, end);
             write_lengths_of_lengths(tree_codes, lengthsOfLengths, &writer, buffer);
             encode_lengths(shortedLengths, shorted_count, tree_codes, lengthsOfLengths, buffer, &writer);
-            encode_range_data(rangedData, sizeData, buffer, headLL, headO, &writer);
+            encode_range_data(rangedBlock, currentBlockSize, buffer, headLL, headO, &writer);
             flushBuf(buffer, &writer);
 
             printf("data writed\n");
@@ -707,6 +662,7 @@ int main()
             free(LLfrequencies);
             free(Ofrequencies);
             free(codeLengths);
+            free(rangedBlock);
             memset(codeLenFreq, 0, sizeof(codeLenFreq));
             free(treesFreq);
             free(shortedLengths);
@@ -720,6 +676,7 @@ int main()
             maxlen=0;
             pos=0;
             printf("--------------------\n");
+            fflush(stdout);
         }
 
         free(matches);
@@ -731,12 +688,13 @@ int main()
         for (size_t k = 0; k < writer.buffPos; ++k) {
             fputc(buffer[k], ofile);
         }
+        writer.buffPos = 0;
+        writer.pos = 0;
+        writer.buff = 0;
         fclose(ofile);
         free(buffer);
-        printf("==================\n");
+        printf("====================\n");
     }
 
     fclose(file);
-
-    return 0;
 }
