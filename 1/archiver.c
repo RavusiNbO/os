@@ -1,0 +1,13 @@
+#include "archiver.h"
+
+
+int main()
+{
+    unsigned char filename[256];
+
+    scanf("%255s", filename);
+
+    compress_directory(filename);
+    
+    return 0;
+}

@@ -9,6 +9,10 @@
         "unistd.h": "c",
         "types.h": "c",
         "stdio.h": "c",
-        "_types.h": "c"
-    }
+        "_types.h": "c",
+        "__config": "c",
+        "cstdio": "cpp",
+        "locale": "cpp"
+    },
+    "C_Cpp.errorSquiggles": "enabled"
 }
