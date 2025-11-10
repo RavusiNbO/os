@@ -25,6 +25,12 @@ struct bitWriter{
     size_t buffPos;
 };
 
+struct bitReader{
+    uint8_t buff;
+    uint8_t pos;
+    size_t buffPos;
+};
+
 struct rangedData{
     bool isLL;
     uint16_t haffCode;
@@ -53,11 +59,19 @@ struct tree{
     struct tree* oneptr;
 };
 
+struct fileTree{
+    char path[30];
+    struct fileTree **childs;
+    size_t childsCount;
+};
+
 struct Block{
     unsigned end_flag;
     unsigned encoding_type;
     uint32_t data;
 };
+
+void update_file_tree(struct fileTree *head, char *path, char *parent);
 
 
 void makeCanonicalCodes(
@@ -96,7 +110,7 @@ void write_bits(struct bitWriter *writer, unsigned value, size_t nbits, uint8_t 
 
 void encode_range_data(struct rangedData* data, size_t size, uint8_t *buffer, struct tree *headLL, struct tree *headO, struct bitWriter *writer);
 
-void encode_lengths(struct shortedLength *shortedLengths, size_t count, uint16_t *tree_codes, uint8_t *tree_code_lens, uint8_t *buffer, struct bitWriter *writer);
+void encode_lengths(struct shortedLength *shortedLengths, size_t count, uint16_t *tree_codes, unsigned *tree_code_lens, uint8_t *buffer, struct bitWriter *writer);
 
 void tree_bypass(struct tree* head, unsigned *frequencies, unsigned *len, unsigned *maxlen, unsigned *lengths, unsigned *pos);
 
@@ -113,3 +127,6 @@ void write_header(struct bitWriter *writer, uint8_t *buff, bool end);
 void write_lengths_of_lengths(uint16_t *codes, unsigned *lengths, struct bitWriter *writer, uint8_t *buffer);
 
 void compress_directory(unsigned char filename[256]);
+
+void write_filename(struct bitWriter *writer, char name[30], uint8_t *buffer, size_t len);
+

@@ -367,7 +367,7 @@ void encode_range_data(struct rangedData* data, size_t size, uint8_t *buffer, st
 }
 
 
-void encode_lengths(struct shortedLength *shortedLengths, size_t count, uint16_t *tree_codes, uint8_t *tree_code_lens, uint8_t *buffer, struct bitWriter *writer) {
+void encode_lengths(struct shortedLength *shortedLengths, size_t count, uint16_t *tree_codes, unsigned *tree_code_lens, uint8_t *buffer, struct bitWriter *writer) {
     for (size_t i = 0; i < count; ++i) {
         uint8_t sym = shortedLengths[i].data;
         uint16_t code = tree_codes[sym];
@@ -515,6 +515,44 @@ void write_lengths_of_lengths(uint16_t *codes, unsigned *lengths, struct bitWrit
     }
 }
 
+void write_filename(struct bitWriter *writer, char name[30], uint8_t *buffer, size_t len)
+{
+    memcpy((void*)(buffer + writer->buffPos), (void*)name, len);
+    writer->buffPos += len;
+    write_bits(writer, 256, 9, buffer, 0, 0);
+}
+
+
+void update_file_tree(struct fileTree *head, char *path, char *parent)
+{
+    struct fileTree * newChild = malloc(sizeof(struct fileTree));
+    newChild->childsCount = 0;
+    newChild->childs = calloc(20, sizeof(struct fileTree));
+    strcpy(newChild->path, path);
+    for (size_t i = 0; i < head->childsCount; i++)
+    {
+        if (strcmp(head->path, parent) == 0)
+        {
+            head->childs[head->childsCount++] = newChild;
+            break;
+        }
+        update_file_tree(head, path, parent);
+    }
+}
+
+// размер длины пути файла - байт
+void write_file_tree(struct fileTree *head, FILE *ofile)
+{
+    size_t pathlen = strlen(head->path);
+    fputc(pathlen, ofile);
+    fwrite(head->path, 1, pathlen, ofile);
+    fputc(head->childsCount, ofile);
+    for (size_t i = 0; i < head->childsCount; i++)
+    {
+        write_file_tree(head->childs[i], ofile);
+    }
+}   
+
 void compress_directory(unsigned char filename[256])
 {
     DIR* dir;
@@ -523,13 +561,13 @@ void compress_directory(unsigned char filename[256])
     int c;
     size_t i, sizeMatches = 0, sizeData = 0, sizeFile = 0, 
     blocksNumber = 0, blockCounter = 0, currentBlockSize = 0, 
-    lastBlockSize = 0, shorted_count, start, to_copy;
-    unsigned char* buff = malloc(1024*1024);
+    lastBlockSize = 0, shorted_count, start, to_copy, names_pointer = 0;
+    unsigned char* buff = malloc(1024*1024), *archiv = malloc(1024*1024*10), name[30];
     struct match *matches;
     unsigned *LLfrequencies, *Ofrequencies, *treesFrequencies, *lengthsFrequencies, 
     *lengths, *codeLengths, maxlen = 0, pos = 0, len = 0,lenLen = 0, lengthsPos = 0,
     *treesFreq, maxlen2 = 0, pos2 = 0;
-    unsigned char path[256];
+    unsigned char path[30], parent[30], tempParent[30];
     struct rangedData* rangedData, *rangedBlock;
     struct tree *headLL, *headO, *headTrees;
     uint8_t *buffer, *trees;
@@ -537,11 +575,19 @@ void compress_directory(unsigned char filename[256])
     uint16_t *codes, *tree_codes;
     bool end;
 
+    strcpy(parent, filename);
+    struct fileTree *root = malloc(sizeof(struct fileTree));
+    strcpy(root->path, filename);
+    root->childs = calloc(20, sizeof(struct fileTree));
+    root->childsCount = 0;
     unsigned codeLenFreq[MAX_BITS+1] = {0};
     unsigned lengthsOfLengths[19] = {0};
 
+
     dir = opendir(filename);
     struct bitWriter writer = {0, 0, 0};
+
+    
 
 
     while ((entry = readdir(dir)) != NULL)
@@ -551,9 +597,13 @@ void compress_directory(unsigned char filename[256])
         snprintf(path, sizeof(path), "%s/%s", filename, entry->d_name);
         if (entry->d_type == DT_DIR) 
         {
+            strcpy(tempParent, parent);
+            strcpy(parent, path);
             compress_directory(path);
+            strcpy(parent, tempParent);
             continue;
         }
+        update_file_tree(&root, path, parent);
         file = fopen(path, "rb");
         if (!file) continue;
 
@@ -567,19 +617,20 @@ void compress_directory(unsigned char filename[256])
             buff[i++] = c;
         }
         sizeFile = i;
+        fclose(file);
+
         
 
         matches = LZ77(buff, sizeFile, &sizeMatches);
         rangedData = to_range(matches, sizeMatches, &sizeData);
         printf("LZ77 worked\n");
+        sizeData += strlen(name) + 2; 
 
         blocksNumber = sizeData / BLOCK_SIZE + (sizeData % BLOCK_SIZE > 0 ? 1 : 0);
         lastBlockSize = sizeData % BLOCK_SIZE;
         if (lastBlockSize == 0) lastBlockSize = BLOCK_SIZE;
 
         
-
-
         while(!end)
         {
             currentBlockSize = BLOCK_SIZE;
@@ -599,17 +650,17 @@ void compress_directory(unsigned char filename[256])
             buffer = malloc(currentBlockSize * 200);
             printf("block readed, size = %d\n", currentBlockSize);
 
-
+            printf("counting frequencies\n");
             LLfrequencies = calloc(288, sizeof(unsigned));
             Ofrequencies  = calloc(30, sizeof(unsigned));
             count_frequencies(rangedBlock, LLfrequencies, Ofrequencies, currentBlockSize);
 
-            printf("frequencies counted\n");
-
+            
+            printf("building trees\n");
             headLL = build_tree(LLfrequencies, 288);
             headO  = build_tree(Ofrequencies, 30);
 
-            printf("trees builded\n");
+            
 
             codeLengths = calloc(318, sizeof(unsigned));
 
@@ -626,36 +677,35 @@ void compress_directory(unsigned char filename[256])
 
 
             printf("making canonical codes\n");
-            makeCanonicalCodes(codeLengths, 318, codes);
+            makeCanonicalCodes(codeLengths, 318, codes); // переделать для shortedLeghts
 
             
-
+            printf("building length tree\n");
             treesFreq = calloc(19, sizeof(unsigned));
             count_frequencies_for_lengths(shortedLengths, treesFreq, shorted_count);
             headTrees = build_tree(treesFreq, 19);
 
-            printf("length tree builded\n");
+            
 
             memset(lengthsOfLengths, 0, sizeof(lengthsOfLengths));
             getLenghtsCodeLengths(lengthsOfLengths, headTrees, 0);
 
 
 
-            tree_codes = calloc(318 , sizeof(uint16_t));
-
+            tree_codes = calloc(19 , sizeof(uint16_t));
             printf("making canonical trees codes\n");
             makeCanonicalCodes(lengthsOfLengths, 19, tree_codes);
             
-            
 
+            printf("writing data\n");
             write_header(&writer, buffer, end);
             write_lengths_of_lengths(tree_codes, lengthsOfLengths, &writer, buffer);
             encode_lengths(shortedLengths, shorted_count, tree_codes, lengthsOfLengths, buffer, &writer);
             encode_range_data(rangedBlock, currentBlockSize, buffer, headLL, headO, &writer);
             flushBuf(buffer, &writer);
-
-            printf("data writed\n");
-
+            
+            
+            printf("cleaning memory\n");
             delete_tree(headTrees);
             delete_tree(headLL);
             delete_tree(headO);
@@ -668,7 +718,7 @@ void compress_directory(unsigned char filename[256])
             free(shortedLengths);
             memset(lengthsOfLengths, 0, sizeof(lengthsOfLengths));
             free(codes);
-            printf("memory cleaned\n");
+            
 
             len=0; 
             maxlen2=0;
@@ -682,19 +732,30 @@ void compress_directory(unsigned char filename[256])
         free(matches);
         free(rangedData);
 
-        snprintf(path, sizeof(path), "%s_arhived", entry->d_name);
-        ofile = fopen(path, "wb");
-        c = 0;
+
+        
+
         for (size_t k = 0; k < writer.buffPos; ++k) {
-            fputc(buffer[k], ofile);
+            archiv[BLOCK_SIZE * (blockCounter - 1) + k] = buffer[k];
         }
+        
+        c = 0;
+        
         writer.buffPos = 0;
         writer.pos = 0;
         writer.buff = 0;
-        fclose(ofile);
         free(buffer);
         printf("====================\n");
     }
 
-    fclose(file);
+
+    snprintf(path, sizeof(path), "%s_arhived", filename);
+    ofile = fopen(path, "wb");
+    write_file_tree(root, ofile);
+    for (size_t k = 0; k < BLOCK_SIZE * (blockCounter - 1) + lastBlockSize; ++k) {
+        fputc(archiv[k], ofile);
+    }
+
+    fclose(ofile);
+    
 }
