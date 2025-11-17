@@ -2,7 +2,7 @@
 
 
 void makeCanonicalCodes(
-    const unsigned *lengths,  
+    unsigned *lengths,  
     unsigned n,               
     uint16_t *codes          
 ) {
@@ -364,10 +364,12 @@ void encode_range_data(struct rangedData* data, size_t size, uint8_t *buffer, st
         }          
 
     }
+    write_bits(writer, 256, 9, buffer, 0, 0);
 }
 
 
 void encode_lengths(struct shortedLength *shortedLengths, size_t count, uint16_t *tree_codes, unsigned *tree_code_lens, uint8_t *buffer, struct bitWriter *writer) {
+    write_bits(writer, count, sizeof(count), buffer, 0, 0);
     for (size_t i = 0; i < count; ++i) {
         uint8_t sym = shortedLengths[i].data;
         uint16_t code = tree_codes[sym];
@@ -527,7 +529,7 @@ void update_file_tree(struct fileTree *head, char *path, char *parent)
 {
     struct fileTree * newChild = malloc(sizeof(struct fileTree));
     newChild->childsCount = 0;
-    newChild->childs = calloc(20, sizeof(struct fileTree));
+    newChild->childs = calloc(20, sizeof(struct fileTree*));
     strcpy(newChild->path, path);
     for (size_t i = 0; i < head->childsCount; i++)
     {
@@ -677,7 +679,7 @@ void compress_directory(unsigned char filename[256])
 
 
             printf("making canonical codes\n");
-            makeCanonicalCodes(codeLengths, 318, codes); // переделать для shortedLeghts
+            makeCanonicalCodes(codeLengths, 318, codes);
 
             
             printf("building length tree\n");
@@ -699,9 +701,13 @@ void compress_directory(unsigned char filename[256])
 
             printf("writing data\n");
             write_header(&writer, buffer, end);
-            write_lengths_of_lengths(tree_codes, lengthsOfLengths, &writer, buffer);
+            write_lengths_of_lengths(tree_codes, lengthsOfLengths, &writer, buffer); // мб надо писать напрямую без кодирования
             encode_lengths(shortedLengths, shorted_count, tree_codes, lengthsOfLengths, buffer, &writer);
             encode_range_data(rangedBlock, currentBlockSize, buffer, headLL, headO, &writer);
+            if (end)
+            {
+                write_bits(&writer, 256, 8, buffer, 0, 0);
+            }
             flushBuf(buffer, &writer);
             
             

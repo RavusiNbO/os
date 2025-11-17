@@ -13,7 +13,7 @@
 #define MAX_MATCH 258
 #define MAX_BITS 15
 #define LENGTHS_SIZE 19
-#define HLIT 31
+#define HLIT 29
 #define HDIST 29
 #define HCLEN 15
 
@@ -75,7 +75,7 @@ void update_file_tree(struct fileTree *head, char *path, char *parent);
 
 
 void makeCanonicalCodes(
-    const unsigned *lengths,  
+    unsigned *lengths,  
     unsigned n,               
     uint16_t *codes          
 );
