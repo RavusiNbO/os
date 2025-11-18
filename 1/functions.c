@@ -2,7 +2,7 @@
 
 
 void makeCanonicalCodes(
-    const unsigned *lengths,  
+    unsigned *lengths,  
     unsigned n,               
     uint16_t *codes          
 ) {

@@ -17,6 +17,28 @@
 #define HDIST 29
 #define HCLEN 15
 
+#ifndef ARCHIVER_H
+#define ARCHIVER_H
+#include <sys/stat.h>
+
+
+// Структуры данных
+struct bitReader {
+    size_t buffPos;
+    unsigned pos;
+    unsigned char buff;
+};
+
+struct fileTree {
+    char path[30];
+    struct fileTree **childs;
+    size_t childsCount;
+};
+
+// Прототипы функций
+
+#endif
+
 typedef enum {LITERAL, MATCH} tok_type;
 
 struct bitWriter{
@@ -25,11 +47,6 @@ struct bitWriter{
     size_t buffPos;
 };
 
-struct bitReader{
-    uint8_t buff;
-    uint8_t pos;
-    size_t buffPos;
-};
 
 struct rangedData{
     bool isLL;
@@ -59,11 +76,6 @@ struct tree{
     struct tree* oneptr;
 };
 
-struct fileTree{
-    char path[30];
-    struct fileTree **childs;
-    size_t childsCount;
-};
 
 struct Block{
     unsigned end_flag;
@@ -75,7 +87,7 @@ void update_file_tree(struct fileTree *head, char *path, char *parent);
 
 
 void makeCanonicalCodes(
-    const unsigned *lengths,  
+    unsigned *lengths,  
     unsigned n,               
     uint16_t *codes          
 );
