@@ -1,5 +1,6 @@
 #include "stdio.h"
 #include <sys/types.h>
+#include "sys/stat.h"
 #include "unistd.h"
 #include "stdlib.h"
 #include "dirent.h"
@@ -17,12 +18,8 @@
 #define HDIST 29
 #define HCLEN 15
 
-#ifndef ARCHIVER_H
-#define ARCHIVER_H
-#include <sys/stat.h>
 
 
-// Структуры данных
 struct bitReader {
     size_t buffPos;
     unsigned pos;
@@ -32,12 +29,9 @@ struct bitReader {
 struct fileTree {
     char path[30];
     struct fileTree **childs;
-    size_t childsCount;
+    uint8_t childsCount;
+    uint8_t isDir;
 };
-
-// Прототипы функций
-
-#endif
 
 typedef enum {LITERAL, MATCH} tok_type;
 
@@ -77,13 +71,7 @@ struct tree{
 };
 
 
-struct Block{
-    unsigned end_flag;
-    unsigned encoding_type;
-    uint32_t data;
-};
-
-void update_file_tree(struct fileTree *head, char *path, char *parent);
+void update_file_tree(struct fileTree *head, char *path, char *parent, uint8_t isDir);
 
 
 void makeCanonicalCodes(

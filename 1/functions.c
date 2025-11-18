@@ -525,9 +525,10 @@ void write_filename(struct bitWriter *writer, char name[30], uint8_t *buffer, si
 }
 
 
-void update_file_tree(struct fileTree *head, char *path, char *parent)
+void update_file_tree(struct fileTree *head, char *path, char *parent, uint8_t isDir)
 {
     struct fileTree * newChild = malloc(sizeof(struct fileTree));
+    newChild->isDir = isDir;
     newChild->childsCount = 0;
     newChild->childs = calloc(20, sizeof(struct fileTree*));
     strcpy(newChild->path, path);
@@ -538,7 +539,7 @@ void update_file_tree(struct fileTree *head, char *path, char *parent)
             head->childs[head->childsCount++] = newChild;
             break;
         }
-        update_file_tree(head, path, parent);
+        update_file_tree(head, path, parent, isDir);
     }
 }
 
@@ -548,6 +549,7 @@ void write_file_tree(struct fileTree *head, FILE *ofile)
     size_t pathlen = strlen(head->path);
     fputc(pathlen, ofile);
     fwrite(head->path, 1, pathlen, ofile);
+    fputc(head->isDir, ofile);
     fputc(head->childsCount, ofile);
     for (size_t i = 0; i < head->childsCount; i++)
     {
@@ -599,13 +601,14 @@ void compress_directory(unsigned char filename[256])
         snprintf(path, sizeof(path), "%s/%s", filename, entry->d_name);
         if (entry->d_type == DT_DIR) 
         {
+            update_file_tree(&root, path, parent, true);
             strcpy(tempParent, parent);
             strcpy(parent, path);
             compress_directory(path);
             strcpy(parent, tempParent);
             continue;
         }
-        update_file_tree(&root, path, parent);
+        update_file_tree(&root, path, parent, false);
         file = fopen(path, "rb");
         if (!file) continue;
 
