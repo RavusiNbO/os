@@ -631,7 +631,6 @@ void compress_directory(char *filename)
         matches = LZ77(buff, sizeFile, &sizeMatches);
         rangedData = to_range(matches, sizeMatches, &sizeData);
         printf("LZ77 worked\n");
-        sizeData += strlen(name) + 2; 
 
         blocksNumber = sizeData / BLOCK_SIZE + (sizeData % BLOCK_SIZE > 0 ? 1 : 0);
         lastBlockSize = sizeData % BLOCK_SIZE;

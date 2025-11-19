@@ -18,9 +18,9 @@
 #define HDIST 29
 #define HCLEN 15
 #define MAX_PATH 1023
-#define LIT 286
+#define LIT 288
 #define DIST 30
-#define LDIST 316
+#define LDIST 318
 
 
 struct bitReader {
