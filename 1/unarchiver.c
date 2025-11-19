@@ -572,7 +572,7 @@ int main(int argc, char **argv)
     br_init(&reader, archiv);
     printf("reading file tree\n");
     read_file_tree(head, archiv, &reader);
-
+    printf("copy path\n");
     strcpy(path, head->path);
     
     mkdir(path, 0777);
