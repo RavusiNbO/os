@@ -92,8 +92,6 @@ void decode_trees(unsigned char *archiv, struct bitReader *reader,
     }
 }
 
-// Остальные функции (decode_data, parseLO, write_file) оставлены почти без изменений,
-// только исправлены типы
 
 void decode_data(struct bitReader *reader, unsigned char *archiv,
                  uint16_t *codes, struct rangedData *rangedData, size_t *size)
@@ -173,12 +171,11 @@ void decompress(struct bitReader *reader, unsigned char *archiv, struct fileTree
     if (head->isDir) {
         mkdir(head->path, 0777);
         for (size_t i = 0; i < head->childsCount; i++) {
-            decompress(reader, archiv, head->childs[i]);  // ← без &
+            decompress(reader, archiv, head->childs[i]);  
         }
         return;
     }
 
-    // ------------------- один файл -------------------
     size_t rangedDataSize = 0, matchesSize = 0, pos = 0;
 
     unsigned treesCodelengths[19] = {0};
@@ -191,7 +188,7 @@ void decompress(struct bitReader *reader, unsigned char *archiv, struct fileTree
     struct match     *matches     = calloc(10000, sizeof(struct match));
     uint8_t          *fileData    = malloc(10 * 1024 * 1024);
 
-    // Заголовок блока
+    printf("reading header\n");
     br_read_bits(reader, archiv, 1); // bfinal
     br_read_bits(reader, archiv, 2); // type = 2
 
@@ -199,23 +196,25 @@ void decompress(struct bitReader *reader, unsigned char *archiv, struct fileTree
     br_read_bits(reader, archiv, 5); // HDIST
     br_read_bits(reader, archiv, 4); // HCLEN
 
-  for (int i = 0; i < 19; i++) {
+    printf("reading lengths\n");
+    for (int i = 0; i < 19; i++) {
         treesCodelengths[alphabet[i]] = br_read_bits(reader, archiv, 3);
     }
-
+    printf("making canonical codes\n");
     makeCanonicalCodes(treesCodelengths, 19, treeCodes);
-
+    printf("decoding trees\n");
     decode_trees(archiv, reader, codeLengths, treeCodes);
-
+    printf("making canonical codes\n");
     makeCanonicalCodes(codeLengths, 318, codes);
-
+    printf("decoding data\n");
     decode_data(reader, archiv, codes, rangedData, &rangedDataSize);
-
+    printf("parsing data\n");
     parseLO(rangedData, rangedDataSize, matches, &matchesSize);
-
+    printf("writing file data\n");
     write_file(fileData, matches, matchesSize, &pos);
 
     FILE *f = fopen(head->path, "wb");
+    printf("writing file\n");
     if (f) {
         fwrite(fileData, 1, pos, f);
         fclose(f);
