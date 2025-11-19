@@ -559,7 +559,7 @@ void write_file_tree(struct fileTree *head, FILE *ofile)
     }
 }   
 
-void compress_directory(unsigned char filename[256])
+void compress_directory(char filename[256])
 {
     DIR* dir;
     struct dirent* entry;
@@ -603,14 +603,14 @@ void compress_directory(unsigned char filename[256])
         snprintf(path, sizeof(path), "%s/%s", filename, entry->d_name);
         if (entry->d_type == DT_DIR) 
         {
-            update_file_tree(&root, path, parent, true);
+            update_file_tree(root, path, parent, true);
             strcpy(tempParent, parent);
             strcpy(parent, path);
             compress_directory(path);
             strcpy(parent, tempParent);
             continue;
         }
-        update_file_tree(&root, path, parent, false);
+        update_file_tree(root, path, parent, false);
         file = fopen(path, "rb");
         if (!file) continue;
 
