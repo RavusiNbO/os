@@ -484,6 +484,9 @@ void decompress(struct bitReader *reader, unsigned char * archiv, struct fileTre
     struct rangedData *rangedData;
     struct match *matches;
     uint8_t *fileData;
+    bool end = false;
+
+    printf("file data\nisdir: %d\npath: %s\nchildsCount: %d", head->isDir, head->path, head->childsCount);
 
     if (head->isDir)
     {
@@ -497,7 +500,7 @@ void decompress(struct bitReader *reader, unsigned char * archiv, struct fileTre
 
     
 
-     while(true){
+     while(!end){ // проблема: надо обозначить концы файла или количество блоков для считывания чтобы знать когда остановиться
         rangedData = calloc(2000, sizeof(struct rangedData));
         matches = calloc(2000, sizeof(struct match));
         fileData = malloc(20000);
