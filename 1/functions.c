@@ -715,33 +715,33 @@ void compress_directory(char *filename)
             
             
             printf("cleaning memory\n");
-            printf("cleaning 1");
+            printf("cleaning 1\n");
             delete_tree(headTrees);
-            printf("cleaning 2");
+            printf("cleaning 2\n");
             delete_tree(headLL);
-            printf("cleaning 3");
+            printf("cleaning 3\n");
             delete_tree(headO);
-            printf("cleaning 4");
+            printf("cleaning 4\n");
             free(LLfrequencies);
-            printf("cleaning 5");
+            printf("cleaning 5\n");
             free(Ofrequencies);
-            printf("cleaning 6");
+            printf("cleaning 6\n");
             free(codeLengths);
-            printf("cleaning 7");
+            printf("cleaning 7\n");
             free(rangedBlock);
-            printf("cleaning 8");
+            printf("cleaning 8\n");
             memset(codeLenFreq, 0, sizeof(codeLenFreq));
-            printf("cleaning 9");
+            printf("cleaning 9\n");
             free(treesFreq);
-            printf("cleaning 10");
+            printf("cleaning 10\n");
             free(tree_codes);
-            printf("cleaning 11");
+            printf("cleaning 11\n");
             free(shortedLengths);
-            printf("cleaning 12");
+            printf("cleaning 12\n");
             memset(lengthsOfLengths, 0, sizeof(lengthsOfLengths));
-            printf("cleaning 13");
+            printf("cleaning 13\n");
             free(codes);
-            printf("cleaning 14");
+            printf("cleaning 14\n");
             free(buffer);
             printf("mem cleaned\n");
             
