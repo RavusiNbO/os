@@ -3,9 +3,9 @@
 
 int main()
 {
-    char *filename = malloc(256);
+    char *filename = malloc(__DARWIN_MAXPATHLEN);
 
-    scanf("%255s", filename);
+    scanf("%1023s", filename);
 
     compress_directory(filename);
     

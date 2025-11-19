@@ -517,7 +517,7 @@ void write_lengths_of_lengths(uint16_t *codes, unsigned *lengths, struct bitWrit
     }
 }
 
-void write_filename(struct bitWriter *writer, char name[30], uint8_t *buffer, size_t len)
+void write_filename(struct bitWriter *writer, char *name, uint8_t *buffer, size_t len)
 {
     memcpy((void*)(buffer + writer->buffPos), (void*)name, len);
     writer->buffPos += len;
@@ -568,12 +568,12 @@ void compress_directory(char *filename)
     size_t i, sizeMatches = 0, sizeData = 0, sizeFile = 0, 
     blocksNumber = 0, blockCounter = 0, currentBlockSize = 0, 
     lastBlockSize = 0, shorted_count, start, to_copy, names_pointer = 0;
-    unsigned char* buff = malloc(1024*1024), *archiv = malloc(1024*1024*10), name[30];
+    unsigned char* buff = malloc(1024*1024), *archiv = malloc(1024*1024*10), *name = malloc(__DARWIN_MAXPATHLEN);
     struct match *matches;
     unsigned *LLfrequencies, *Ofrequencies, *treesFrequencies, *lengthsFrequencies, 
     *lengths, *codeLengths, maxlen = 0, pos = 0, len = 0,lenLen = 0, lengthsPos = 0,
     *treesFreq, maxlen2 = 0, pos2 = 0;
-    unsigned char path[30], parent[30], tempParent[30];
+    unsigned char path[__DARWIN_MAXPATHLEN], parent[__DARWIN_MAXPATHLEN], tempParent[__DARWIN_MAXPATHLEN];
     struct rangedData* rangedData, *rangedBlock;
     struct tree *headLL, *headO, *headTrees;
     uint8_t *buffer, *trees;

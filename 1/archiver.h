@@ -27,7 +27,7 @@ struct bitReader {
 };
 
 struct fileTree {
-    char path[30];
+    char *path;
     struct fileTree **childs;
     uint8_t childsCount;
     uint8_t isDir;
@@ -128,5 +128,5 @@ void write_lengths_of_lengths(uint16_t *codes, unsigned *lengths, struct bitWrit
 
 void compress_directory(char *filename);
 
-void write_filename(struct bitWriter *writer, char name[30], uint8_t *buffer, size_t len);
+void write_filename(struct bitWriter *writer, char *name, uint8_t *buffer, size_t len);
 
