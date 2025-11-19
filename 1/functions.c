@@ -727,6 +727,7 @@ void compress_directory(char *filename)
             free(shortedLengths);
             memset(lengthsOfLengths, 0, sizeof(lengthsOfLengths));
             free(codes);
+            free(buffer);
             
 
             len=0; 
@@ -753,7 +754,6 @@ void compress_directory(char *filename)
         writer.buffPos = 0;
         writer.pos = 0;
         writer.buff = 0;
-        free(buffer);
         printf("====================\n");
     }
 
