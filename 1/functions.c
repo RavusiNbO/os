@@ -530,7 +530,7 @@ void update_file_tree(struct fileTree *head, char *path, char *parent, uint8_t i
     if (strcmp(head->path, parent) == 0)
     {
         struct fileTree *child = malloc(sizeof(struct fileTree));
-        child->path = malloc(1023);
+        child->path = malloc(MAX_PATH);
         child->isDir = isDir;
         child->childsCount = 0;
         child->childs = calloc(20, sizeof(struct fileTree*));
@@ -569,12 +569,12 @@ void compress_directory(char *filename)
     size_t i, sizeMatches = 0, sizeData = 0, sizeFile = 0, 
     blocksNumber = 0, blockCounter = 0, currentBlockSize = 0, 
     lastBlockSize = 0, shorted_count, start, to_copy, names_pointer = 0;
-    unsigned char* buff = malloc(1024*1024), *archiv = malloc(1024*1024*10), *name = malloc(1023);
+    unsigned char* buff = malloc(1024*1024), *archiv = malloc(1024*1024*10), *name = malloc(MAX_PATH);
     struct match *matches;
     unsigned *LLfrequencies, *Ofrequencies, *treesFrequencies, *lengthsFrequencies, 
     *lengths, *codeLengths, maxlen = 0, pos = 0, len = 0,lenLen = 0, lengthsPos = 0,
     *treesFreq, maxlen2 = 0, pos2 = 0;
-    unsigned char path[1023], parent[1023], tempParent[1023];
+    char *path = malloc(MAX_PATH), *parent = malloc(MAX_PATH), *tempParent = malloc(MAX_PATH);
     struct rangedData* rangedData, *rangedBlock;
     struct tree *headLL, *headO, *headTrees;
     uint8_t *buffer, *trees;
@@ -584,24 +584,22 @@ void compress_directory(char *filename)
 
     strcpy(parent, filename);
     struct fileTree *root = malloc(sizeof(struct fileTree));
+    root->path = malloc(MAX_PATH);
     strcpy(root->path, filename);
     root->childs = calloc(20, sizeof(struct fileTree));
     root->childsCount = 0;
     unsigned codeLenFreq[MAX_BITS+1] = {0};
     unsigned lengthsOfLengths[19] = {0};
 
-
+    printf("opening dir\n");
     dir = opendir(filename);
     struct bitWriter writer = {0, 0, 0};
 
     
-
-
     while ((entry = readdir(dir)) != NULL)
     {
-
         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) continue;
-        snprintf(path, sizeof(path), "%s/%s", filename, entry->d_name);
+        snprintf(path, MAX_PATH, "%s/%s", filename, entry->d_name);
         if (entry->d_type == DT_DIR) 
         {
             update_file_tree(root, path, parent, true);
