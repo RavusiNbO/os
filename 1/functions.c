@@ -530,6 +530,7 @@ void update_file_tree(struct fileTree *head, char *path, char *parent, uint8_t i
     if (strcmp(head->path, parent) == 0)
     {
         struct fileTree *child = malloc(sizeof(struct fileTree));
+        child->path = malloc(1023);
         child->isDir = isDir;
         child->childsCount = 0;
         child->childs = calloc(20, sizeof(struct fileTree*));
@@ -568,12 +569,12 @@ void compress_directory(char *filename)
     size_t i, sizeMatches = 0, sizeData = 0, sizeFile = 0, 
     blocksNumber = 0, blockCounter = 0, currentBlockSize = 0, 
     lastBlockSize = 0, shorted_count, start, to_copy, names_pointer = 0;
-    unsigned char* buff = malloc(1024*1024), *archiv = malloc(1024*1024*10), *name = malloc(__DARWIN_MAXPATHLEN);
+    unsigned char* buff = malloc(1024*1024), *archiv = malloc(1024*1024*10), *name = malloc(1023);
     struct match *matches;
     unsigned *LLfrequencies, *Ofrequencies, *treesFrequencies, *lengthsFrequencies, 
     *lengths, *codeLengths, maxlen = 0, pos = 0, len = 0,lenLen = 0, lengthsPos = 0,
     *treesFreq, maxlen2 = 0, pos2 = 0;
-    unsigned char path[__DARWIN_MAXPATHLEN], parent[__DARWIN_MAXPATHLEN], tempParent[__DARWIN_MAXPATHLEN];
+    unsigned char path[1023], parent[1023], tempParent[1023];
     struct rangedData* rangedData, *rangedBlock;
     struct tree *headLL, *headO, *headTrees;
     uint8_t *buffer, *trees;
