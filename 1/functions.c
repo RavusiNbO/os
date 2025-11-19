@@ -620,14 +620,14 @@ void compress_directory(char *filename, uint8_t *archiv, struct bitWriter *write
         snprintf(path, MAX_PATH, "%s/%s", filename, entry->d_name);
         if (entry->d_type == DT_DIR) 
         {
-            update_file_tree(root, path, parent, true);
+            update_file_tree(*root, path, parent, true);
             strcpy(tempParent, parent);
             strcpy(parent, path);
             compress_directory(path, archiv, writer, root);
             strcpy(parent, tempParent);
             continue;
         }
-        update_file_tree(root, path, parent, false);
+        update_file_tree(*root, path, parent, false);
         file = fopen(path, "rb");
         if (!file) continue;
 
