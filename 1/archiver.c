@@ -3,7 +3,7 @@
 
 int main()
 {
-    unsigned char filename[256];
+    char filename[256];
 
     scanf("%255s", filename);
 
