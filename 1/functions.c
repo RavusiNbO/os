@@ -306,6 +306,7 @@ struct rangedData* to_range(const struct match *matches, size_t size, size_t *ou
 
 void count_frequencies(struct rangedData* data, unsigned* LLfreq, unsigned* Ofreq, size_t size) 
 {
+    printf("asdas");
     for (size_t i = 0; i < size; i++) {
         printf("%d", i);
         if (data[i].isLL)
