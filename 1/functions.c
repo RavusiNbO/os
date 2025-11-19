@@ -559,6 +559,7 @@ void write_file_tree(struct fileTree *head, FILE *ofile)
 {
     printf("enter\n");
     size_t pathlen = strlen(head->path);
+    printf("%s\n", head->path);
     printf("pathlen\n");
     fputc(pathlen, ofile);
     printf("path\n");
