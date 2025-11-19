@@ -2,7 +2,8 @@ WARP.md
 *.png
 *.jpg
 *.jpeg
-*_arhived
+*_archived
 archiver
 отчеты
 .vscode/
+unarchiver

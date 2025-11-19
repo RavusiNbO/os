@@ -527,21 +527,23 @@ void write_filename(struct bitWriter *writer, char name[30], uint8_t *buffer, si
 
 void update_file_tree(struct fileTree *head, char *path, char *parent, uint8_t isDir)
 {
-    struct fileTree * newChild = malloc(sizeof(struct fileTree));
-    newChild->isDir = isDir;
-    newChild->childsCount = 0;
-    newChild->childs = calloc(20, sizeof(struct fileTree*));
-    strcpy(newChild->path, path);
+    if (strcmp(head->path, parent) == 0)
+    {
+        struct fileTree *child = malloc(sizeof(struct fileTree));
+        child->isDir = isDir;
+        child->childsCount = 0;
+        child->childs = calloc(20, sizeof(struct fileTree*));
+        strcpy(child->path, path);
+        head->childs[head->childsCount++] = child;
+        return;
+    }
+
     for (size_t i = 0; i < head->childsCount; i++)
     {
-        if (strcmp(head->path, parent) == 0)
-        {
-            head->childs[head->childsCount++] = newChild;
-            break;
-        }
-        update_file_tree(head, path, parent, isDir);
+        update_file_tree(head->childs[i], path, parent, isDir);
     }
 }
+
 
 // размер длины пути файла - байт
 void write_file_tree(struct fileTree *head, FILE *ofile)
@@ -758,7 +760,7 @@ void compress_directory(unsigned char filename[256])
     }
 
 
-    snprintf(path, sizeof(path), "%s_arhived", filename);
+    snprintf(path, sizeof(path), "%s_archived", filename);
     ofile = fopen(path, "wb");
     write_file_tree(root, ofile);
     for (size_t k = 0; k < BLOCK_SIZE * (blockCounter - 1) + lastBlockSize; ++k) {

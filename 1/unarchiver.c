@@ -4,7 +4,7 @@ void br_init(struct bitReader *r, const unsigned char *data)
 {
     r->buffPos = 0;
     r->pos = 0;
-    r->buff = data[r->buffPos++];
+    r->buff = data[0]; 
 }
 
 
@@ -12,7 +12,7 @@ unsigned br_read_bits(struct bitReader *r, const unsigned char *data, size_t nbi
 {
     unsigned val = 0;
     for (size_t i = 0; i < nbits; ++i) {
-        unsigned bit = (r->buff >> r->pos) & 1u; 
+        unsigned bit = (r->buff >> r->pos + 1) & 1u; 
         val |= (bit << i);                     
         r->pos++;
         if (r->pos == 8) {
@@ -23,19 +23,21 @@ unsigned br_read_bits(struct bitReader *r, const unsigned char *data, size_t nbi
     return val;
 }
 
-struct fileTree *read_file_tree(struct fileTree *head, unsigned char *archiv, struct bitReader *reader)
+struct fileTree *read_file_tree(unsigned char *archiv, struct bitReader *reader)
 {
-    head = malloc(sizeof(struct fileTree));
+    struct fileTree *head = malloc(sizeof(struct fileTree));
     head->childs = calloc(20, sizeof(struct fileTree*));
     size_t pathlen;
     pathlen = archiv[reader->buffPos++];
+    printf("memcpy\n");
     memcpy(head->path, archiv + reader->buffPos, pathlen);
+    printf("memcpy done\n");
     reader->buffPos += pathlen;
     head->isDir = archiv[reader->buffPos++];
     head->childsCount = archiv[reader->buffPos++];
     for (size_t i = 0; i < head->childsCount; i++)
     {
-        head->childs[i] = read_file_tree(head->childs[i], archiv, reader);
+        head->childs[i] = read_file_tree(archiv, reader);
     }
     return head;
 }
@@ -487,53 +489,51 @@ void decompress(struct bitReader *reader, unsigned char * archiv, struct fileTre
 
     if (head->isDir)
     {
-        mkdir(head->path, S_IRWXU);
+        mkdir(head->path, 0777);
         for (size_t i = 0; i < head->childsCount; i++)
         {
-            decompress(&reader, archiv, head);
+            decompress(&reader, archiv, head->childs[i]);
         }
         return;
     }
 
     
 
-     while(true){
-        rangedData = calloc(2000, sizeof(struct rangedData));
-        matches = calloc(2000, sizeof(struct match));
-        fileData = malloc(20000);
+    rangedData = calloc(2000, sizeof(struct rangedData));
+    matches = calloc(2000, sizeof(struct match));
+    fileData = malloc(20000);
 
-        bfinal = (uint8_t)br_read_bits(reader, archiv, 1);  
-        coding = (uint8_t)br_read_bits(reader, archiv, 2);  
-        hlit   = (uint8_t)br_read_bits(reader, archiv, 5); 
-        hdist  = (uint8_t)br_read_bits(reader, archiv, 5);  
-        hclen  = (uint8_t)br_read_bits(reader, archiv, 4);  
-        for (size_t i = 0; i < sizeof(alphabet); i++)
-        {
-            treesCodelengths[alphabet[i]] = br_read_bits(reader, archiv, 3);
-        }
-
-
-        makeCanonicalCodes(treesCodelengths, sizeof(alphabet), treeCodes);
-
-        decode_trees(archiv, &reader, codeLengths, treeCodes);
-
-        makeCanonicalCodes(codeLengths, 318, codes);
-
-        decode_data(&reader, archiv, codes, rangedData, &rangedDataSize);
-
-        parseLO(rangedData, rangedDataSize, matches, &matchesSize);
-
-        write_file(fileData, matches, matchesSize, &pos);
-
-        free(rangedData);
-        free(matches);
-        free(fileData);
-        memset(treesCodelengths, 0, sizeof(treesCodelengths));
-        memset(treeCodes, 0, sizeof(treeCodes));
-        memset(codes, 0, sizeof(codes));
-        memset(codeLengths, 0, sizeof(codeLengths));
-
+    bfinal = (uint8_t)br_read_bits(reader, archiv, 1);  
+    coding = (uint8_t)br_read_bits(reader, archiv, 2);  
+    hlit   = (uint8_t)br_read_bits(reader, archiv, 5); 
+    hdist  = (uint8_t)br_read_bits(reader, archiv, 5);  
+    hclen  = (uint8_t)br_read_bits(reader, archiv, 4);  
+    for (size_t i = 0; i < sizeof(alphabet); i++)
+    {
+        treesCodelengths[alphabet[i]] = br_read_bits(reader, archiv, 3);
     }
+
+
+    makeCanonicalCodes(treesCodelengths, sizeof(alphabet), treeCodes);
+
+    decode_trees(archiv, &reader, codeLengths, treeCodes);
+
+    makeCanonicalCodes(codeLengths, 318, codes);
+
+    decode_data(&reader, archiv, codes, rangedData, &rangedDataSize);
+
+    parseLO(rangedData, rangedDataSize, matches, &matchesSize);
+
+    write_file(fileData, matches, matchesSize, &pos);
+
+    free(rangedData);
+    free(matches);
+    free(fileData);
+    memset(treesCodelengths, 0, sizeof(treesCodelengths));
+    memset(treeCodes, 0, sizeof(treeCodes));
+    memset(codes, 0, sizeof(codes));
+    memset(codeLengths, 0, sizeof(codeLengths));
+
 
     FILE *file = fopen(head->path, "wb");
     fwrite(fileData, 1, pos, file);
@@ -548,7 +548,7 @@ int main(int argc, char **argv)
     FILE* file;
     struct fileTree *head;
     unsigned char *archiv = malloc(10 * 1024 * 1024);
-    char *path[30];    
+    char *path[30], ofileName[30];    
     struct bitReader reader = {0, 0, 0};
     
 
@@ -563,15 +563,19 @@ int main(int argc, char **argv)
 
     br_init(&reader, archiv);
 
-    read_file_tree(head, archiv, &reader);
+    printf("reading file tree\n");
+    head = read_file_tree(archiv, &reader);
+    printf("file tree readed\n");
 
     strcpy(path, head->path);
-    
-    mkdir(path, S_IRWXU);
+    strcpy(ofileName, path);
+    mkdir(path, 0777);
+    printf("dir created\n");
+    printf("%d\n", head->childsCount);
 
     for (size_t i = 0; i < head->childsCount; i++)
     {
-        decompress(&reader, archiv, head);
+        decompress(&reader, archiv, head->childs[i]);
     }
     
 
