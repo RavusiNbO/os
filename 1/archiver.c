@@ -3,7 +3,7 @@
 
 int main()
 {
-    char filename[256];
+    char *filename = malloc(256);
 
     scanf("%255s", filename);
 

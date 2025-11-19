@@ -559,7 +559,7 @@ void write_file_tree(struct fileTree *head, FILE *ofile)
     }
 }   
 
-void compress_directory(char filename[256])
+void compress_directory(char *filename)
 {
     DIR* dir;
     struct dirent* entry;
