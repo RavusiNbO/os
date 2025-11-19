@@ -487,7 +487,7 @@ void decompress(struct bitReader *reader, unsigned char * archiv, struct fileTre
 
     if (head->isDir)
     {
-        mkdir(head->path, S_IRWXU);
+        mkdir(head->path, 0777);
         for (size_t i = 0; i < head->childsCount; i++)
         {
             decompress(reader, archiv, head);
@@ -567,7 +567,7 @@ int main(int argc, char **argv)
 
     strcpy(path, head->path);
     
-    mkdir(path, S_IRWXU);
+    mkdir(path, 0777);
 
     for (size_t i = 0; i < head->childsCount; i++)
     {
