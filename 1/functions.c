@@ -33,7 +33,7 @@ void makeCanonicalCodes(
     }
 }
 
-int find_best_match(const unsigned char *data, size_t pos, size_t size, unsigned *out_len, unsigned *out_dist) {
+int find_best_match(const uint8_t *data, size_t pos, size_t size, unsigned *out_len, unsigned *out_dist) {
     size_t start = (pos > WINDOW_SIZE) ? pos - WINDOW_SIZE : 0;
     unsigned best_len = 0;
     unsigned best_dist = 0;
@@ -57,7 +57,7 @@ int find_best_match(const unsigned char *data, size_t pos, size_t size, unsigned
     return (best_len >= MIN_MATCH);
 }
 
-struct match* LZ77(unsigned char *buf, size_t bytes_read, size_t *sizeMatches)
+struct match* LZ77(uint8_t *buf, size_t bytes_read, size_t *sizeMatches)
 {
     struct match* matches = malloc(bytes_read * sizeof(struct match));
     unsigned len, dist;
@@ -559,7 +559,7 @@ void write_file_tree(struct fileTree *head, FILE *ofile)
     }
 }   
 
-void compress_directory(char *filename)
+void compress_directory(char *filename, uint8_t *archiv, struct bitWriter *writer, struct fileTree *root)
 {
     DIR* dir;
     struct dirent* entry;
@@ -568,7 +568,7 @@ void compress_directory(char *filename)
     size_t i, sizeMatches = 0, sizeData = 0, sizeFile = 0, 
     blocksNumber = 0, blockCounter = 0, currentBlockSize = 0, 
     lastBlockSize = 0, shorted_count, start, to_copy, names_pointer = 0;
-    unsigned char* buff = malloc(1024*1024), *archiv = malloc(1024*1024*10), *name = malloc(MAX_PATH);
+    uint8_t * buff = malloc(1024*1024), *name = malloc(MAX_PATH);
     struct match *matches;
     unsigned *LLfrequencies, *Ofrequencies, *treesFrequencies, *lengthsFrequencies, 
     *lengths, *codeLengths, maxlen = 0, pos = 0, len = 0,lenLen = 0, lengthsPos = 0,
@@ -580,19 +580,23 @@ void compress_directory(char *filename)
     struct shortedLength *shortedLengths;
     uint16_t *codes, *tree_codes;
     bool end;
+    struct bitWriter bufWriter = {0, 0, 0};
 
     strcpy(parent, filename);
-    struct fileTree *root = malloc(sizeof(struct fileTree));
-    root->path = malloc(MAX_PATH);
-    strcpy(root->path, filename);
-    root->childs = calloc(20, sizeof(struct fileTree));
-    root->childsCount = 0;
+
+    if (strcspn(filename, "/") == strlen(filename)) {
+        root = malloc(sizeof(struct fileTree));
+        root->path = malloc(MAX_PATH);
+        strcpy(root->path, filename);
+        root->childs = calloc(20, sizeof(struct fileTree));
+        root->childsCount = 0;
+    }
+
     unsigned codeLenFreq[MAX_BITS+1] = {0};
     unsigned lengthsOfLengths[19] = {0};
 
     printf("opening dir\n");
     dir = opendir(filename);
-    struct bitWriter writer = {0, 0, 0};
 
     
     while ((entry = readdir(dir)) != NULL)
@@ -604,7 +608,7 @@ void compress_directory(char *filename)
             update_file_tree(root, path, parent, true);
             strcpy(tempParent, parent);
             strcpy(parent, path);
-            compress_directory(path);
+            compress_directory(path, archiv, writer, root);
             strcpy(parent, tempParent);
             continue;
         }
@@ -702,15 +706,15 @@ void compress_directory(char *filename)
             
 
             printf("writing data\n");
-            write_header(&writer, buffer, end);
-            write_lengths_of_lengths(tree_codes, lengthsOfLengths, &writer, buffer); // мб надо писать напрямую без кодирования
-            encode_lengths(shortedLengths, shorted_count, tree_codes, lengthsOfLengths, buffer, &writer);
-            encode_range_data(rangedBlock, currentBlockSize, buffer, headLL, headO, &writer);
+            write_header(&bufWriter, buffer, end);
+            write_lengths_of_lengths(tree_codes, lengthsOfLengths, &bufWriter, buffer); // мб надо писать напрямую без кодирования
+            encode_lengths(shortedLengths, shorted_count, tree_codes, lengthsOfLengths, buffer, &bufWriter);
+            encode_range_data(rangedBlock, currentBlockSize, buffer, headLL, headO, &bufWriter);
             if (end)
             {
-                write_bits(&writer, 256, 8, buffer, 0, 0);
+                write_bits(&bufWriter, 256, 8, buffer, 0, 0);
             }
-            flushBuf(buffer, &writer);
+            flushBuf(buffer, &bufWriter);
             
             
             printf("cleaning memory\n");
@@ -740,8 +744,6 @@ void compress_directory(char *filename)
             memset(lengthsOfLengths, 0, sizeof(lengthsOfLengths));
             printf("cleaning 13\n");
             free(codes);
-            printf("cleaning 14\n");
-            free(buffer);
             printf("mem cleaned\n");
             
 
@@ -760,29 +762,16 @@ void compress_directory(char *filename)
 
 
         
-
-        for (size_t k = 0; k < writer.buffPos; ++k) {
-            archiv[BLOCK_SIZE * (blockCounter - 1) + k] = buffer[k];
+        for (size_t k = (*writer).buffPos; k < (*writer).buffPos + bufWriter.buffPos; ++k) {
+            archiv[k] = buffer[k - (*writer).buffPos];
         }
         
         c = 0;
         
-        writer.buffPos = 0;
-        writer.pos = 0;
-        writer.buff = 0;
         printf("====================\n");
     }
 
 
-    snprintf(path, sizeof(path), "%s_archived", filename);
-    ofile = fopen(path, "wb");
-
-    printf("writing archiv\n");
-    write_file_tree(root, ofile);
-    for (size_t k = 0; k < BLOCK_SIZE * (blockCounter - 1) + lastBlockSize; ++k) {
-        fputc(archiv[k], ofile);
-    }
-
-    fclose(ofile);
+    
     
 }

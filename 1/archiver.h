@@ -26,7 +26,7 @@
 struct bitReader {
     size_t buffPos;
     unsigned pos;
-    unsigned char buff;
+    uint8_t buff;
 };
 
 struct fileTree {
@@ -63,7 +63,7 @@ struct match{
     tok_type type;
     uint offset;
     uint length;
-    unsigned char literal;
+    uint8_t literal;
 };
 
 struct tree{
@@ -83,9 +83,9 @@ void makeCanonicalCodes(
     uint16_t *codes          
 );
 
-int find_best_match(const unsigned char *data, size_t pos, size_t size, unsigned *out_len, unsigned *out_dist);
+int find_best_match(const uint8_t *data, size_t pos, size_t size, unsigned *out_len, unsigned *out_dist);
 
-struct match* LZ77(unsigned char *buf, size_t bytes_read, size_t *sizeMatches);
+struct match* LZ77(uint8_t *buf, size_t bytes_read, size_t *sizeMatches);
 
 void find_smallest_pair(struct tree **arr, unsigned *indSmallest, unsigned *indSmall, size_t size);
 
@@ -129,7 +129,8 @@ void write_header(struct bitWriter *writer, uint8_t *buff, bool end);
 
 void write_lengths_of_lengths(uint16_t *codes, unsigned *lengths, struct bitWriter *writer, uint8_t *buffer);
 
-void compress_directory(char *filename);
+void compress_directory(char *filename, uint8_t *archiv, struct bitWriter *writer, struct fileTree *root);
 
 void write_filename(struct bitWriter *writer, char *name, uint8_t *buffer, size_t len);
 
+void write_file_tree(struct fileTree *head, FILE *ofile);
