@@ -724,6 +724,7 @@ void compress_directory(char *filename)
             free(rangedBlock);
             memset(codeLenFreq, 0, sizeof(codeLenFreq));
             free(treesFreq);
+            free(tree_codes);
             free(shortedLengths);
             memset(lengthsOfLengths, 0, sizeof(lengthsOfLengths));
             free(codes);
