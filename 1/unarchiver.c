@@ -502,29 +502,33 @@ void decompress(struct bitReader *reader, unsigned char * archiv, struct fileTre
         matches = calloc(2000, sizeof(struct match));
         fileData = malloc(20000);
 
+        printf("reading header\n");
         bfinal = (uint8_t)br_read_bits(reader, archiv, 1);  
         coding = (uint8_t)br_read_bits(reader, archiv, 2);  
         hlit   = (uint8_t)br_read_bits(reader, archiv, 5); 
         hdist  = (uint8_t)br_read_bits(reader, archiv, 5);  
         hclen  = (uint8_t)br_read_bits(reader, archiv, 4);  
+
+        printf("reading lengths\n");
         for (size_t i = 0; i < sizeof(alphabet); i++)
         {
             treesCodelengths[alphabet[i]] = br_read_bits(reader, archiv, 3);
         }
 
-
+        printf("making canonical codes\n");
         makeCanonicalCodes(treesCodelengths, sizeof(alphabet), treeCodes);
-
+        printf("decoding trees\n");
         decode_trees(archiv, reader, codeLengths, treeCodes);
-
+        printf("making canonical codes\n");
         makeCanonicalCodes(codeLengths, 318, codes);
-
+        printf("decoding data\n");
         decode_data(reader, archiv, codes, rangedData, &rangedDataSize);
-
+        printf("parsing data\n");
         parseLO(rangedData, rangedDataSize, matches, &matchesSize);
-
+        printf("writing file data\n");
         write_file(fileData, matches, matchesSize, &pos);
 
+        printf("clearing memory\n");
         free(rangedData);
         free(matches);
         free(fileData);
@@ -535,6 +539,7 @@ void decompress(struct bitReader *reader, unsigned char * archiv, struct fileTre
 
     }
 
+    printf("writing file\n");
     FILE *file = fopen(head->path, "wb");
     fwrite(fileData, 1, pos, file);
     fclose(file);
@@ -562,7 +567,7 @@ int main(int argc, char **argv)
     fclose(file);
 
     br_init(&reader, archiv);
-
+    printf("reading file tree\n");
     read_file_tree(head, archiv, &reader);
 
     strcpy(path, head->path);
@@ -571,6 +576,7 @@ int main(int argc, char **argv)
 
     for (size_t i = 0; i < head->childsCount; i++)
     {
+        printf("decompressing %s", head->path);
         decompress(&reader, archiv, head);
     }
     
