@@ -307,6 +307,7 @@ struct rangedData* to_range(const struct match *matches, size_t size, size_t *ou
 void count_frequencies(struct rangedData* data, unsigned* LLfreq, unsigned* Ofreq, size_t size) 
 {
     for (size_t i = 0; i < size; i++) {
+        printf("%d", i);
         if (data[i].isLL)
             LLfreq[data[i].haffCode]++;
         else
@@ -659,6 +660,7 @@ void compress_directory(char *filename)
             printf("counting frequencies\n");
             LLfrequencies = calloc(288, sizeof(unsigned));
             Ofrequencies  = calloc(30, sizeof(unsigned));
+            printf("block size: %d\n", currentBlockSize);
             count_frequencies(rangedBlock, LLfrequencies, Ofrequencies, currentBlockSize);
 
             

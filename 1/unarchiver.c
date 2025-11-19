@@ -32,6 +32,7 @@ unsigned br_read_bits(struct bitReader *r, const unsigned char *data, size_t nbi
 struct fileTree *read_file_tree(unsigned char *archiv, struct bitReader *reader)
 {
     struct fileTree *head = malloc(sizeof(struct fileTree));
+    head->path = malloc(1023);
     head->childs = calloc(20, sizeof(struct fileTree*));
     head->childsCount = 0;
 
