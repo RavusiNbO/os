@@ -145,7 +145,6 @@ void refreshArr(struct tree*** arr, unsigned indSmallest, unsigned indSmall, str
         }
     }
     newArr[j] = newNode;
-    free(*arr);
     *arr = newArr;
 }
 
