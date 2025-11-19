@@ -134,18 +134,27 @@ struct tree* merge(struct tree* smallest, struct tree* small) {
     return newNode;
 }
 
-void refreshArr(struct tree*** arr, unsigned indSmallest, unsigned indSmall, struct tree *newNode, size_t *size) {
-    struct tree** newArr = calloc(*size, sizeof(struct tree*));
+void refreshArr(struct tree*** arr, unsigned indSmallest, unsigned indSmall, 
+                struct tree *newNode, size_t *size) {
+    if (*size < 2) return;
+    
+    struct tree** newArr = calloc(*size - 1, sizeof(struct tree*));
     if (!newArr) return;
     
     size_t j = 0;
     for (size_t i = 0; i < *size; i++) {
         if (i != indSmallest && i != indSmall) {
-            newArr[j++] = (*arr)[i];
+            if (j < *size - 1) {
+                newArr[j++] = (*arr)[i];
+            }
         }
     }
-    newArr[j] = newNode;
+    if (j < *size - 1) {
+        newArr[j] = newNode;
+    }
+    free(*arr);
     *arr = newArr;
+    (*size)--;
 }
 
 struct tree* build_tree(unsigned *frequencies, size_t size) {
@@ -185,7 +194,7 @@ struct tree* build_tree(unsigned *frequencies, size_t size) {
             return NULL;
         }
         refreshArr(&arr, indSmallest, indSmall, newNode, &current_size);
-        current_size--;
+        
     }
 
     struct tree *root = arr[0];
@@ -548,18 +557,24 @@ void update_file_tree(struct fileTree *head, char *path, char *parent, uint8_t i
 // размер длины пути файла - байт
 void write_file_tree(struct fileTree *head, FILE *ofile)
 {
+    printf("enter\n");
     size_t pathlen = strlen(head->path);
+    printf("pathlen\n");
     fputc(pathlen, ofile);
+    printf("path\n");
     fwrite(head->path, 1, pathlen, ofile);
+    printf("isdir\n");
     fputc(head->isDir, ofile);
+    printf("chcount\n");
     fputc(head->childsCount, ofile);
+    printf("next\n\n");
     for (size_t i = 0; i < head->childsCount; i++)
     {
         write_file_tree(head->childs[i], ofile);
     }
 }   
 
-void compress_directory(char *filename, uint8_t *archiv, struct bitWriter *writer, struct fileTree *root)
+void compress_directory(char *filename, uint8_t *archiv, struct bitWriter *writer, struct fileTree **root)
 {
     DIR* dir;
     struct dirent* entry;
@@ -585,11 +600,11 @@ void compress_directory(char *filename, uint8_t *archiv, struct bitWriter *write
     strcpy(parent, filename);
 
     if (strcspn(filename, "/") == strlen(filename)) {
-        root = malloc(sizeof(struct fileTree));
-        root->path = malloc(MAX_PATH);
-        strcpy(root->path, filename);
-        root->childs = calloc(20, sizeof(struct fileTree));
-        root->childsCount = 0;
+        (*root) = malloc(sizeof(struct fileTree));
+        (*root)->path = malloc(MAX_PATH);
+        strcpy((*root)->path, filename);
+        (*root)->childs = calloc(20, sizeof(struct fileTree));
+        (*root)->childsCount = 0;
     }
 
     unsigned codeLenFreq[MAX_BITS+1] = {0};
@@ -637,12 +652,12 @@ void compress_directory(char *filename, uint8_t *archiv, struct bitWriter *write
         blocksNumber = sizeData / BLOCK_SIZE + (sizeData % BLOCK_SIZE > 0 ? 1 : 0);
         lastBlockSize = sizeData % BLOCK_SIZE;
         if (lastBlockSize == 0) lastBlockSize = BLOCK_SIZE;
-
+        buffer = malloc(BLOCK_SIZE * 100000);
         
         while(!end)
         {
             currentBlockSize = BLOCK_SIZE;
-            printf("reading block №: %d of %s\n", ++blockCounter, path);
+            printf("reading block №: %zu of %s\n", ++blockCounter, path);
             if (blockCounter == blocksNumber) 
             {
                 end = true;
@@ -655,8 +670,8 @@ void compress_directory(char *filename, uint8_t *archiv, struct bitWriter *write
             for (size_t j = 0; j < to_copy; ++j) rangedBlock[j] = rangedData[start + j];
             
 
-            buffer = malloc(currentBlockSize * 200);
-            printf("block readed, size = %d\n", currentBlockSize);
+            
+            printf("block readed, size = %zu\n", currentBlockSize);
 
             printf("counting frequencies\n");
             LLfrequencies = calloc(LIT, sizeof(unsigned));
@@ -745,7 +760,6 @@ void compress_directory(char *filename, uint8_t *archiv, struct bitWriter *write
             printf("cleaning 13\n");
             free(codes);
             printf("mem cleaned\n");
-            
 
             len=0; 
             maxlen2=0;
@@ -765,7 +779,7 @@ void compress_directory(char *filename, uint8_t *archiv, struct bitWriter *write
         for (size_t k = (*writer).buffPos; k < (*writer).buffPos + bufWriter.buffPos; ++k) {
             archiv[k] = buffer[k - (*writer).buffPos];
         }
-        
+        free(buffer);
         c = 0;
         
         printf("====================\n");

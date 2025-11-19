@@ -129,7 +129,7 @@ void write_header(struct bitWriter *writer, uint8_t *buff, bool end);
 
 void write_lengths_of_lengths(uint16_t *codes, unsigned *lengths, struct bitWriter *writer, uint8_t *buffer);
 
-void compress_directory(char *filename, uint8_t *archiv, struct bitWriter *writer, struct fileTree *root);
+void compress_directory(char *filename, uint8_t *archiv, struct bitWriter *writer, struct fileTree **root);
 
 void write_filename(struct bitWriter *writer, char *name, uint8_t *buffer, size_t len);
 
