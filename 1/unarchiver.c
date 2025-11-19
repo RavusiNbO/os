@@ -477,12 +477,12 @@ void decompress(struct bitReader *reader, unsigned char * archiv, struct fileTre
     size_t rangedDataSize = 0, pos = 0, matchesSize = 0;
     uint8_t hclen = 0, hdist = 0, hlit = 0, coding = 0;
     uint8_t bfinal = 0;
-    uint8_t treesCodelengths[19];
+    unsigned treesCodelengths[19];
     uint8_t alphabet[] = {16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15};
     uint16_t treeCodes[19], codes[318];
     unsigned codeLengths[318];
     struct rangedData *rangedData;
-    struct matches *matches;
+    struct match *matches;
     uint8_t *fileData;
 
     if (head->isDir)
@@ -490,7 +490,7 @@ void decompress(struct bitReader *reader, unsigned char * archiv, struct fileTre
         mkdir(head->path, S_IRWXU);
         for (size_t i = 0; i < head->childsCount; i++)
         {
-            decompress(&reader, archiv, head);
+            decompress(reader, archiv, head);
         }
         return;
     }
@@ -515,11 +515,11 @@ void decompress(struct bitReader *reader, unsigned char * archiv, struct fileTre
 
         makeCanonicalCodes(treesCodelengths, sizeof(alphabet), treeCodes);
 
-        decode_trees(archiv, &reader, codeLengths, treeCodes);
+        decode_trees(archiv, reader, codeLengths, treeCodes);
 
         makeCanonicalCodes(codeLengths, 318, codes);
 
-        decode_data(&reader, archiv, codes, rangedData, &rangedDataSize);
+        decode_data(reader, archiv, codes, rangedData, &rangedDataSize);
 
         parseLO(rangedData, rangedDataSize, matches, &matchesSize);
 
@@ -548,7 +548,7 @@ int main(int argc, char **argv)
     FILE* file;
     struct fileTree *head;
     unsigned char *archiv = malloc(10 * 1024 * 1024);
-    char *path[30];    
+    char path[30];    
     struct bitReader reader = {0, 0, 0};
     
 
