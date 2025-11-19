@@ -729,6 +729,7 @@ void compress_directory(char *filename)
             memset(lengthsOfLengths, 0, sizeof(lengthsOfLengths));
             free(codes);
             free(buffer);
+            printf("mem cleaned\n");
             
 
             len=0; 
@@ -739,9 +740,10 @@ void compress_directory(char *filename)
             printf("--------------------\n");
             fflush(stdout);
         }
-
+        printf("cleaning file mem\n");
         free(matches);
         free(rangedData);
+        printf("file mem cleaned\n");
 
 
         
@@ -761,6 +763,8 @@ void compress_directory(char *filename)
 
     snprintf(path, sizeof(path), "%s_archived", filename);
     ofile = fopen(path, "wb");
+
+    printf("writing archiv\n");
     write_file_tree(root, ofile);
     for (size_t k = 0; k < BLOCK_SIZE * (blockCounter - 1) + lastBlockSize; ++k) {
         fputc(archiv[k], ofile);
