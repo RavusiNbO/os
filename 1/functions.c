@@ -306,7 +306,6 @@ struct rangedData* to_range(const struct match *matches, size_t size, size_t *ou
 
 void count_frequencies(struct rangedData* data, unsigned* LLfreq, unsigned* Ofreq, size_t size) 
 {
-    printf("asdas");
     for (size_t i = 0; i < size; i++) {
         printf("%d", i);
         if (data[i].isLL)
@@ -659,34 +658,34 @@ void compress_directory(char *filename)
             printf("block readed, size = %d\n", currentBlockSize);
 
             printf("counting frequencies\n");
-            LLfrequencies = calloc(288, sizeof(unsigned));
-            Ofrequencies  = calloc(30, sizeof(unsigned));
+            LLfrequencies = calloc(LIT, sizeof(unsigned));
+            Ofrequencies  = calloc(DIST, sizeof(unsigned));
             printf("block size: %d\n", currentBlockSize);
             count_frequencies(rangedBlock, LLfrequencies, Ofrequencies, currentBlockSize);
 
             
             printf("building trees\n");
-            headLL = build_tree(LLfrequencies, 288);
-            headO  = build_tree(Ofrequencies, 30);
+            headLL = build_tree(LLfrequencies, LIT);
+            headO  = build_tree(Ofrequencies, DIST);
 
             
 
-            codeLengths = calloc(318, sizeof(unsigned));
+            codeLengths = calloc(LDIST, sizeof(unsigned));
 
 
             maxlen = 0, pos = 0;
             count_code_length(codeLenFreq, headLL, headO, &maxlen, codeLengths, &pos);
 
             printf("repeats compression\n"); 
-            shortedLengths = calloc(318, sizeof(struct shortedLength));
-            repeats_compression(codeLengths, shortedLengths, 318, &shorted_count);
+            shortedLengths = calloc(LDIST, sizeof(struct shortedLength));
+            repeats_compression(codeLengths, shortedLengths, LDIST, &shorted_count);
             
-            codes = calloc(318 , sizeof(uint16_t));
+            codes = calloc(LDIST , sizeof(uint16_t));
 
 
 
             printf("making canonical codes\n");
-            makeCanonicalCodes(codeLengths, 318, codes);
+            makeCanonicalCodes(codeLengths, LDIST, codes);
 
             
             printf("building length tree\n");
