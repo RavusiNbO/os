@@ -28,6 +28,7 @@ struct fileTree *read_file_tree(struct fileTree *head, unsigned char *archiv, st
     head = malloc(sizeof(struct fileTree));
     head->childs = calloc(20, sizeof(struct fileTree*));
     size_t pathlen;
+    printf("%s\t%d\n", head->path, head->childsCount);
     pathlen = archiv[reader->buffPos++];
     memcpy(head->path, archiv + reader->buffPos, pathlen);
     reader->buffPos += pathlen;
