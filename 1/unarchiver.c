@@ -31,9 +31,12 @@ struct fileTree *read_file_tree(struct fileTree *head, unsigned char *archiv, st
     printf("%s\t%d\n", head->path, head->childsCount);
     pathlen = archiv[reader->buffPos++];
     memcpy(head->path, archiv + reader->buffPos, pathlen);
+    printf("%s\t%d\n", head->path, head->childsCount);
     reader->buffPos += pathlen;
     head->isDir = archiv[reader->buffPos++];
+    printf("%s\t%d\t%d\n", head->path, head->childsCount, head->isDir);
     head->childsCount = archiv[reader->buffPos++];
+    printf("%s\t%d\n", head->path, head->childsCount);
     for (size_t i = 0; i < head->childsCount; i++)
     {
         head->childs[i] = read_file_tree(head->childs[i], archiv, reader);
