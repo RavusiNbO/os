@@ -569,6 +569,7 @@ void write_file_tree(struct fileTree *head, FILE *ofile)
     printf("chcount\n");
     fputc(head->childsCount, ofile);
     printf("next\n\n");
+    printf("%s, %d, %d\n", head->path, head->isDir, head->childsCount);
     for (size_t i = 0; i < head->childsCount; i++)
     {
         write_file_tree(head->childs[i], ofile);
