@@ -29,16 +29,11 @@ struct fileTree *read_file_tree(struct fileTree *head, unsigned char *archiv, st
     head->childs = calloc(20, sizeof(struct fileTree*));
     head->path = malloc(MAX_PATH);
     size_t pathlen;
-    printf("%s\t%d\n", head->path, head->childsCount);
     pathlen = archiv[reader->buffPos++];
-    printf("memcpy %d\n", pathlen);
     memcpy(head->path, &(archiv[reader->buffPos]), pathlen);
-    printf("%s\t%d\n", head->path, head->childsCount);
     reader->buffPos += pathlen;
     head->isDir = archiv[reader->buffPos++];
-    printf("%s\t%d\t%d\n", head->path, head->childsCount, head->isDir);
     head->childsCount = archiv[reader->buffPos++];
-    printf("%s\t%d\n", head->path, head->childsCount);
     for (size_t i = 0; i < head->childsCount; i++)
     {
         head->childs[i] = read_file_tree(head->childs[i], archiv, reader);
@@ -492,8 +487,8 @@ void decompress(struct bitReader *reader, unsigned char * archiv, struct fileTre
     uint8_t *fileData;
     bool end = false;
 
-    printf("file data\nisdir: %d\npath: %s\nchildsCount: %d", head->isDir, head->path, head->childsCount);
-
+    printf("isdir: %d\npath: %s\nchildsCount: %d\n", head->isDir, head->path, head->childsCount);
+    return 0;
     if (head->isDir)
     {
         mkdir(head->path, 0777);

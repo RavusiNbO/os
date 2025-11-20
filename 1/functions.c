@@ -780,6 +780,7 @@ void compress_directory(char *filename, uint8_t *archiv, struct bitWriter *write
         for (size_t k = (*writer).buffPos; k < (*writer).buffPos + bufWriter.buffPos; ++k) {
             archiv[k] = buffer[k - (*writer).buffPos];
         }
+        flushBuf(archiv, writer);
         free(buffer);
         c = 0;
         

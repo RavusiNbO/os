@@ -13,7 +13,6 @@ int main()
 
     scanf("%1023s", filename);
     compress_directory(filename, archiv, &writer, &root);
-    flushBuf(archiv, &writer);
 
     snprintf(path, MAX_PATH, "%s_archived", filename);
     ofile = fopen(path, "wb");
