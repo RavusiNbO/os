@@ -488,7 +488,7 @@ void decompress(struct bitReader *reader, unsigned char * archiv, struct fileTre
     bool end = false;
 
     printf("isdir: %d\npath: %s\nchildsCount: %d\n", head->isDir, head->path, head->childsCount);
-    return 0;
+    return ;
     if (head->isDir)
     {
         mkdir(head->path, 0777);
