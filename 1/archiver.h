@@ -34,7 +34,9 @@ struct fileTree {
     struct fileTree **childs;
     uint8_t childsCount;
     uint8_t isDir;
+    uint16_t blockCount;
 };
+
 
 typedef enum {LITERAL, MATCH} tok_type;
 
@@ -74,7 +76,7 @@ struct tree{
 };
 
 
-void update_file_tree(struct fileTree *head, char *path, char *parent, uint8_t isDir);
+struct fileTree* update_file_tree(struct fileTree *head, char *path, char *parent, uint8_t isDir);
 
 
 void makeCanonicalCodes(

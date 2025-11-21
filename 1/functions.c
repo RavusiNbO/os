@@ -533,7 +533,7 @@ void write_filename(struct bitWriter *writer, char *name, uint8_t *buffer, size_
 }
 
 
-void update_file_tree(struct fileTree *head, char *path, char *parent, uint8_t isDir)
+struct fileTree *update_file_tree(struct fileTree *head, char *path, char *parent, uint8_t isDir)
 {
     if (strcmp(head->path, parent) == 0)
     {
@@ -544,12 +544,12 @@ void update_file_tree(struct fileTree *head, char *path, char *parent, uint8_t i
         child->childs = calloc(20, sizeof(struct fileTree*));
         strcpy(child->path, path);
         head->childs[head->childsCount++] = child;
-        return;
+        return child;
     }
 
     for (size_t i = 0; i < head->childsCount; i++)
     {
-        update_file_tree(head->childs[i], path, parent, isDir);
+        return update_file_tree(head->childs[i], path, parent, isDir);
     }
 }
 
@@ -557,24 +557,19 @@ void update_file_tree(struct fileTree *head, char *path, char *parent, uint8_t i
 // размер длины пути файла - байт
 void write_file_tree(struct fileTree *head, FILE *ofile)
 {
-    printf("enter\n");
-    size_t pathlen = strlen(head->path);
-    printf("%s\n", head->path);
-    printf("pathlen\n");
+    uint8_t pathlen = strlen(head->path);
+    printf("%s\t%d\t%d\t%d\t%u\n", head->path, head->childsCount, head->isDir, pathlen, head->blockCount);
     fputc(pathlen, ofile);
-    printf("path\n");
     fwrite(head->path, 1, pathlen, ofile);
-    printf("isdir\n");
     fputc(head->isDir, ofile);
-    printf("chcount\n");
     fputc(head->childsCount, ofile);
-    printf("next\n\n");
-    printf("%s, %d, %d\n", head->path, head->isDir, head->childsCount);
+    fwrite(&(head->blockCount), 2, 1, ofile);
     for (size_t i = 0; i < head->childsCount; i++)
     {
         write_file_tree(head->childs[i], ofile);
     }
 }   
+
 
 void compress_directory(char *filename, uint8_t *archiv, struct bitWriter *writer, struct fileTree **root)
 {
@@ -597,14 +592,18 @@ void compress_directory(char *filename, uint8_t *archiv, struct bitWriter *write
     struct shortedLength *shortedLengths;
     uint16_t *codes, *tree_codes;
     bool end;
+    struct fileTree *curNode;
     struct bitWriter bufWriter = {0, 0, 0};
 
     strcpy(parent, filename);
+    
+    
 
     if (strcspn(filename, "/") == strlen(filename)) {
         (*root) = malloc(sizeof(struct fileTree));
         (*root)->path = malloc(MAX_PATH);
         strcpy((*root)->path, filename);
+        (*root)->isDir = true;
         (*root)->childs = calloc(20, sizeof(struct fileTree));
         (*root)->childsCount = 0;
     }
@@ -614,7 +613,6 @@ void compress_directory(char *filename, uint8_t *archiv, struct bitWriter *write
 
     printf("opening dir\n");
     dir = opendir(filename);
-
     
     while ((entry = readdir(dir)) != NULL)
     {
@@ -622,14 +620,15 @@ void compress_directory(char *filename, uint8_t *archiv, struct bitWriter *write
         snprintf(path, MAX_PATH, "%s/%s", filename, entry->d_name);
         if (entry->d_type == DT_DIR) 
         {
-            update_file_tree(*root, path, parent, true);
+            curNode = update_file_tree(*root, path, parent, true);
+            curNode->blockCount = 0;
             strcpy(tempParent, parent);
             strcpy(parent, path);
             compress_directory(path, archiv, writer, root);
             strcpy(parent, tempParent);
             continue;
         }
-        update_file_tree(*root, path, parent, false);
+        curNode = update_file_tree(*root, path, parent, false);
         file = fopen(path, "rb");
         if (!file) continue;
 
@@ -655,7 +654,7 @@ void compress_directory(char *filename, uint8_t *archiv, struct bitWriter *write
         lastBlockSize = sizeData % BLOCK_SIZE;
         if (lastBlockSize == 0) lastBlockSize = BLOCK_SIZE;
         buffer = malloc(BLOCK_SIZE * 100000);
-        
+        curNode->blockCount = blocksNumber;
         while(!end)
         {
             currentBlockSize = BLOCK_SIZE;
@@ -724,8 +723,16 @@ void compress_directory(char *filename, uint8_t *archiv, struct bitWriter *write
 
             printf("writing data\n");
             write_header(&bufWriter, buffer, end);
-            write_lengths_of_lengths(tree_codes, lengthsOfLengths, &bufWriter, buffer); // мб надо писать напрямую без кодирования
+            write_lengths_of_lengths(tree_codes, lengthsOfLengths, &bufWriter, buffer); 
+            for (size_t i = 0 ; i < 318; i++)
+            {
+                printf("%d\t%d\n", lengthsOfLengths[i], tree_codes[i]);
+            }
             encode_lengths(shortedLengths, shorted_count, tree_codes, lengthsOfLengths, buffer, &bufWriter);
+            for (size_t i = 0 ; i < 318; i++)
+            {
+                printf("%d\t%d\n", shortedLengths->data, codes[i]);
+            }
             encode_range_data(rangedBlock, currentBlockSize, buffer, headLL, headO, &bufWriter);
             if (end)
             {
@@ -777,9 +784,10 @@ void compress_directory(char *filename, uint8_t *archiv, struct bitWriter *write
         printf("file mem cleaned\n");
 
 
-        
-        for (size_t k = (*writer).buffPos; k < (*writer).buffPos + bufWriter.buffPos; ++k) {
+        size_t roof = (*writer).buffPos + bufWriter.buffPos;
+        for (size_t k = (*writer).buffPos; k < roof; ++k) {
             archiv[k] = buffer[k - (*writer).buffPos];
+            (*writer).buffPos++;
         }
         flushBuf(archiv, writer);
         free(buffer);
