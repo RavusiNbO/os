@@ -81,6 +81,12 @@ struct fileTree* update_file_tree(struct fileTree *head, char *path, char *paren
 
 void makeCanonicalCodes(
     unsigned *lengths,  
+    int n,               
+    uint16_t *codes          
+);
+
+void makeCanonicalCodesShorted(
+    struct shortedLength *lengths,  
     unsigned n,               
     uint16_t *codes          
 );
@@ -113,15 +119,16 @@ void flushBuf(uint8_t *buff, struct bitWriter * writer);
 
 void write_bits(struct bitWriter *writer, unsigned value, size_t nbits, uint8_t *buff, uint8_t extraVal, uint8_t extraLen);
 
-void encode_range_data(struct rangedData* data, size_t size, uint8_t *buffer, struct tree *headLL, struct tree *headO, struct bitWriter *writer);
+void encode_range_data(struct rangedData* data, size_t size, uint8_t *buffer, struct bitWriter *writer, uint16_t *codes, unsigned *codeLengths);
 
 void encode_lengths(struct shortedLength *shortedLengths, size_t count, uint16_t *tree_codes, unsigned *tree_code_lens, uint8_t *buffer, struct bitWriter *writer);
 
 void tree_bypass(struct tree* head, unsigned *frequencies, unsigned *len, unsigned *maxlen, unsigned *lengths, unsigned *pos);
 
-void getLenghtsCodeLengths(unsigned *lengths, struct tree* head, size_t length);
+void getLenghtsCodeLengths(unsigned *lengths, struct tree* head, unsigned length);
 
 void delete_tree(struct tree* head);
+
 
 void count_code_length(unsigned *frequencies, struct tree *headLL, struct tree *headO, unsigned *maxlen, unsigned *lengths, unsigned *pos);
 

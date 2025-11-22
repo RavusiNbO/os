@@ -1,29 +1,60 @@
 #include "archiver.h"
 
 
-void makeCanonicalCodes(
-    unsigned *lengths,  
-    unsigned n,               
-    uint16_t *codes          
-) {
+void makeCanonicalCodes(unsigned *code_lengths, int num_symbols, uint16_t *codes)
+{
     unsigned bl_count[MAX_BITS + 1] = {0};
     unsigned next_code[MAX_BITS + 1] = {0};
 
+    // Считаем количество кодов на каждую длину
+    for (int i = 0; i < num_symbols; i++) {
+        if (code_lengths[i]) bl_count[code_lengths[i]]++;
+    }
+
+    // Первый код для каждой длины
+    unsigned code = 0;
+    for (int bits = 1; bits <= MAX_BITS; bits++) {
+        code = (code + bl_count[bits - 1]) << 1;
+        next_code[bits] = code;
+    }
+
+    // Обнуляем выход
+    for (int i = 0; i < num_symbols; i++) codes[i] = 0;
+
+    // Проходим в порядке: сначала короткие коды, потом длинные
+    // При равных длинах — по возрастанию символа
+    for (int len = 1; len <= MAX_BITS; len++) {
+        for (int symbol = 0; symbol < num_symbols; symbol++) {
+            if (code_lengths[symbol] == len) {
+                codes[symbol] = next_code[len]++;
+            }
+        }
+    }
+}
+
+void makeCanonicalCodesShorted(
+    struct shortedLength *lengths,  
+    unsigned n,               
+    uint16_t *codes          
+) {
+    unsigned *bl_count = calloc(n, sizeof(unsigned));
+    memset(bl_count, 0, n);
+    unsigned *next_code = calloc(n, sizeof(unsigned));
+    memset(next_code, 0, n);
+
     for (unsigned i = 0; i < n; i++) {
-        unsigned len = lengths[i];
-        if (len != 0)
-            bl_count[len]++;
+        unsigned len = lengths[i].data;
+        bl_count[len]++;
     }
 
     unsigned code = 0;
-    bl_count[0] = 0;
-    for (unsigned bits = 1; bits <= MAX_BITS; bits++) {
+    for (unsigned bits = 1; bits < n; bits++) {
         code = (code + bl_count[bits - 1]) << 1;
         next_code[bits] = code;
     }
 
     for (unsigned i = 0; i < n; i++) {
-        unsigned len = lengths[i];
+        unsigned len = lengths[i].data;
         if (len != 0) {
             codes[i] = next_code[len];
             next_code[len]++;
@@ -31,30 +62,41 @@ void makeCanonicalCodes(
             codes[i] = 0;
         }
     }
+    free(bl_count);
+    free(next_code);
 }
 
 int find_best_match(const uint8_t *data, size_t pos, size_t size, unsigned *out_len, unsigned *out_dist) {
+    if (pos >= size) return 0;
+    
     size_t start = (pos > WINDOW_SIZE) ? pos - WINDOW_SIZE : 0;
     unsigned best_len = 0;
     unsigned best_dist = 0;
-    
 
     for (size_t j = start; j < pos; ++j) {
         unsigned len = 0;
-        while (len < MAX_MATCH && pos + len < size && data[j + len] == data[pos + len]) {
+        
+        while (len < MAX_MATCH && 
+               pos + len < size && 
+               j + len < pos &&     
+               data[j + len] == data[pos + len]) {
             len++;
         }
-        if (len > best_len && len >= MIN_MATCH) {
+        
+        if (len >= MIN_MATCH && len > best_len) {
             best_len = len;
             best_dist = (unsigned)(pos - j);
-            if (best_len == MAX_MATCH)
-                break; 
+            if (best_len == MAX_MATCH) break;
         }
     }
 
-    *out_len = best_len;
-    *out_dist = best_dist;
-    return (best_len >= MIN_MATCH);
+    if (best_len >= MIN_MATCH) {
+        *out_len = best_len;
+        *out_dist = best_dist;
+        return 1;
+    }
+    
+    return 0;
 }
 
 struct match* LZ77(uint8_t *buf, size_t bytes_read, size_t *sizeMatches)
@@ -71,16 +113,17 @@ struct match* LZ77(uint8_t *buf, size_t bytes_read, size_t *sizeMatches)
             matches[cur].length = len;
             matches[cur].offset = dist;
             i+=len;
+            cur++;
         }
         else{
             matches[cur].type = LITERAL;
             matches[cur].literal = buf[i];
             i++;
+            cur++;
         }
-        cur++;
-        
     }
-    *sizeMatches = cur;
+    *sizeMatches=cur;
+    
     return matches;
 }
 
@@ -187,7 +230,9 @@ struct tree* build_tree(unsigned *frequencies, size_t size) {
 
     while (current_size > 1) {
         find_smallest_pair(arr, &indSmallest, &indSmall, current_size);
+        printf("pair: %d %d %d %d\n", arr[indSmallest]->symbol, arr[indSmallest]->data, arr[indSmall]->symbol, arr[indSmallest]->data);
         struct tree *newNode = merge(arr[indSmallest], arr[indSmall]);
+        printf("merged node: %d\n", newNode->data);
         if (!newNode) {
             for (size_t i = 0; i < current_size; i++) free(arr[i]);
             free(arr);
@@ -233,6 +278,9 @@ void length_to_code(unsigned length, uint16_t *code, uint16_t *base, uint8_t *ex
       0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,
       3,3,3,3,4,4,4,4,5,5,5,5,0
     };
+    *extra = 0;
+    *base = 0;
+    *code = 0;
     for (int i = 0; i < 29; ++i) {
         uint16_t b = bases[i];
         uint8_t e = extras[i];
@@ -241,10 +289,8 @@ void length_to_code(unsigned length, uint16_t *code, uint16_t *base, uint8_t *ex
             *code = 257 + i;
             *base = b;
             *extra = e;
-            return;
         }
     }
-    *code = 285; *base = 258; *extra = 0;
 }
 
 void dist_to_code(unsigned dist, uint16_t *code, uint16_t *base, uint8_t *extra) {
@@ -257,6 +303,9 @@ void dist_to_code(unsigned dist, uint16_t *code, uint16_t *base, uint8_t *extra)
       0,0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,
       7,7,8,8,9,9,10,10,11,11,12,12,13,13
     };
+    *code = 0;
+    *base = 0;
+    *extra = 0;
     for (int i=0;i<30;i++){
         uint16_t b = dbases[i];
         uint8_t e = dextra[i];
@@ -265,10 +314,8 @@ void dist_to_code(unsigned dist, uint16_t *code, uint16_t *base, uint8_t *extra)
             *code = i;
             *base = b;
             *extra = e;
-            return;
         }
     }
-    *code = 29; *base = 24577; *extra = 13;
 }
 
 struct rangedData* to_range(const struct match *matches, size_t size, size_t *outSize)
@@ -278,6 +325,7 @@ struct rangedData* to_range(const struct match *matches, size_t size, size_t *ou
 
 
     for (size_t i = 0; i < size; i++) {
+        arr[k].haffLen = 1;
         if (matches[i].type == LITERAL) {
             arr[k].isLL = true;
             arr[k].haffCode = matches[i].literal;
@@ -285,24 +333,38 @@ struct rangedData* to_range(const struct match *matches, size_t size, size_t *ou
             arr[k].haffLen = 8;
             arr[k].extraLen = 0;
             k++;
+            (*outSize)++;
         } else {
             uint16_t lcode, lbase;
             uint8_t lextra;
             length_to_code(matches[i].length, &lcode, &lbase, &lextra);
             arr[k].isLL = true;
             arr[k].haffCode = lcode;
+            while (lcode != 0 && lcode != 1)
+            {
+                lcode = lcode / 2;
+                arr[k].haffLen++;
+            }
             arr[k].extraVal = matches[i].length - lbase;
             arr[k].extraLen = lextra;
             k++;
+            (*outSize)++;
 
+            arr[k].haffLen = 1;
             uint16_t dcode, dbase;
             uint8_t dextra;
             dist_to_code(matches[i].offset, &dcode, &dbase, &dextra);
             arr[k].isLL = false;
-            arr[k].haffCode = dcode;
+            arr[k].haffCode = dcode + 288;
+            while (dcode != 0 && dcode != 1)
+            {
+                dcode = dcode / 2;
+                arr[k].haffLen++;
+            }
             arr[k].extraVal = matches[i].offset - dbase;
             arr[k].extraLen = dextra;
             k++;
+            (*outSize)++;
         }
     }
 
@@ -315,10 +377,16 @@ struct rangedData* to_range(const struct match *matches, size_t size, size_t *ou
 void count_frequencies(struct rangedData* data, unsigned* LLfreq, unsigned* Ofreq, size_t size) 
 {
     for (size_t i = 0; i < size; i++) {
-        if (data[i].isLL)
+        if (data[i].isLL == true)
+        {
             LLfreq[data[i].haffCode]++;
+            printf("%zu: %d %d, ", i, data[i].haffCode, LLfreq[data[i].haffCode]);
+        }
         else
-            Ofreq[data[i].haffCode]++;
+        {
+            Ofreq[data[i].haffCode-288]++;
+            printf("%zu: %d %d, ", i, data[i].haffCode, Ofreq[data[i].haffCode]);
+        }
     }
 }
 
@@ -353,7 +421,7 @@ void write_bits(struct bitWriter *writer, unsigned value, size_t nbits, uint8_t 
 }
 
 
-void encode_range_data(struct rangedData* data, size_t size, uint8_t *buffer, struct tree *headLL, struct tree *headO, struct bitWriter *writer)
+void encode_range_data(struct rangedData* data, size_t size, uint8_t *buffer, struct bitWriter *writer, uint16_t *codes, unsigned *codeLengths)
 {
     uint16_t encoded;
     unsigned short sizeEncoded;
@@ -361,16 +429,7 @@ void encode_range_data(struct rangedData* data, size_t size, uint8_t *buffer, st
     for (size_t i = 0 ; i < size; i++)
     {
         uint16_t code16; unsigned codeLen16;
-        if (data[i].isLL) {
-            if (find_code_in_tree(headLL, data[i].haffCode, 0, 0, &code16, &codeLen16)) {
-                write_bits(writer, code16, codeLen16, buffer, data[i].extraVal, data[i].extraLen);
-            } 
-        } else {
-            if (find_code_in_tree(headO, data[i].haffCode, 0, 0, &code16, &codeLen16)) {
-                write_bits(writer, code16, codeLen16, buffer, data[i].extraVal, data[i].extraLen);
-            } 
-        }          
-
+        write_bits(writer, codes[data[i].haffCode], codeLengths[data[i].haffCode], buffer, data[i].extraVal, data[i].extraLen);
     }
     write_bits(writer, 256, 9, buffer, 0, 0);
 }
@@ -382,10 +441,12 @@ void encode_lengths(struct shortedLength *shortedLengths, size_t count, uint16_t
         uint8_t sym = shortedLengths[i].data;
         uint16_t code = tree_codes[sym];
         uint8_t clen = tree_code_lens[sym];
-        write_bits(writer, code, clen, buffer, 0, 0);
-        if (sym == 16) write_bits(writer, shortedLengths[i].extra_bits, 2, buffer, 0, 0);
-        else if (sym == 17) write_bits(writer, shortedLengths[i].extra_bits, 3, buffer, 0, 0);
-        else if (sym == 18) write_bits(writer, shortedLengths[i].extra_bits, 7, buffer, 0, 0);
+        if (sym == 16) write_bits(writer, code, clen , buffer, shortedLengths[i].extra_bits, 2);
+        else if (sym == 17) write_bits(writer, code, clen, buffer, shortedLengths[i].extra_bits, 3);
+        else if (sym == 18) write_bits(writer, code, clen, buffer, shortedLengths[i].extra_bits, 7);
+        else{
+            write_bits(writer, code, clen, buffer, 0, 0);
+        }
     }
 }
 
@@ -418,13 +479,11 @@ void tree_bypass(struct tree* head, unsigned *frequencies, unsigned *len, unsign
 
 
 // нахожу длины каждого кода
-void getLenghtsCodeLengths(unsigned *lengths, struct tree* head, size_t length)
+void getLenghtsCodeLengths(unsigned *lengths, struct tree* head, unsigned length)
 {
-    if (!head) return;
-
     if (!head->zeroptr && !head->oneptr) {
-        if (head->symbol < 19)
-            lengths[head->symbol] = length;
+        lengths[head->symbol] = length;
+        printf("%u  %u\n", head->symbol, lengths[head->symbol]);
         return;
     }
 
@@ -448,18 +507,6 @@ void delete_tree(struct tree* head) {
     free(head);
 }
 
-void count_code_length(unsigned *frequencies, struct tree *headLL, struct tree *headO, unsigned *maxlen, unsigned *lengths, unsigned *pos)
-{
-    unsigned ll_lengths[288] = {0};
-    unsigned o_lengths[30] = {0};
-
-    getLenghtsCodeLengths(ll_lengths, headLL, 0);
-    getLenghtsCodeLengths(o_lengths, headO, 0);
-
-    memcpy(lengths, ll_lengths, 288 * sizeof(unsigned));
-    memcpy(lengths + 288, o_lengths, 30 * sizeof(unsigned));
-
-}
 
 void repeats_compression(unsigned *lengths, struct shortedLength *shorted, size_t size, size_t *shorted_count)
 {
@@ -467,40 +514,52 @@ void repeats_compression(unsigned *lengths, struct shortedLength *shorted, size_
     size_t counter = 1, k = 0;
     size_t repeat;
 
-    for (size_t i = 1; i <= size; i++) {
-        if (i < size && lengths[i] == dup) {
-            counter++;
-            continue;
-        }
-
+    for (size_t i = 1; i < size; i++) {
+        printf("i: %zu lengths[i]: %u dup: %u counter: %zu\n", i, lengths[i], dup, counter);
         if (dup != 0) {
-            while (counter >= 3) {
+
+            if (i != size - 1 && dup == lengths[i] && counter < 6)
+            {
+                counter++;
+                continue;
+            }
+            if (i == size - 1) counter++;
+            if (counter >= 3) {
                 repeat = (counter > 6) ? 6 : counter;
                 shorted[k].data = 16;
                 shorted[k++].extra_bits = repeat - 3;
-                counter -= repeat;
+                counter = 1;
+                continue;
             }
-            while (counter--) shorted[k++].data = dup;
+            
         } else {
-            while (counter >= 11) {
+            if (i != size - 1 && dup == lengths[i] && counter < 138) {
+                counter++;
+                continue;
+            }
+            if (i == size - 1) counter++;
+            if (counter >= 11) {
                 repeat = (counter > 138) ? 138 : counter;
                 shorted[k].data = 18;
                 shorted[k++].extra_bits = repeat - 11;
-                counter -= repeat;
+                counter = 1;
+                dup = lengths[i];
+                continue;
             }
-            while (counter >= 3) {
+            if (counter >= 3) {
                 repeat = (counter > 10) ? 10 : counter;
                 shorted[k].data = 17;
                 shorted[k++].extra_bits = repeat - 3;
-                counter -= repeat;
+                counter = 1;
+                dup = lengths[i];
+                continue;
             }
-            while (counter--) shorted[k++].data = 0;
         }
-
-        if (i < size) {
-            dup = lengths[i];
-            counter = 1;
-        }
+        while (counter--) shorted[k++].data = dup;
+        dup = lengths[i];
+        counter = 1;
+        
+        
     }
     (*shorted_count) = k;
 }
@@ -520,7 +579,7 @@ void write_lengths_of_lengths(uint16_t *codes, unsigned *lengths, struct bitWrit
     const int CLEN_ORDER[19] = {16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15};
     unsigned to_write = (HCLEN + 4); 
     for (unsigned i = 0; i < to_write; ++i) {
-        uint8_t val = lengths[CLEN_ORDER[i]]; // 0..7
+        uint8_t val = lengths[CLEN_ORDER[i]];
         write_bits(writer, val, 3, buffer, 0, 0);
     }
 }
@@ -645,11 +704,10 @@ void compress_directory(char *filename, uint8_t *archiv, struct bitWriter *write
         fclose(file);
 
         
-
         matches = LZ77(buff, sizeFile, &sizeMatches);
         rangedData = to_range(matches, sizeMatches, &sizeData);
         printf("LZ77 worked\n");
-
+        
         blocksNumber = sizeData / BLOCK_SIZE + (sizeData % BLOCK_SIZE > 0 ? 1 : 0);
         lastBlockSize = sizeData % BLOCK_SIZE;
         if (lastBlockSize == 0) lastBlockSize = BLOCK_SIZE;
@@ -671,39 +729,70 @@ void compress_directory(char *filename, uint8_t *archiv, struct bitWriter *write
             for (size_t j = 0; j < to_copy; ++j) rangedBlock[j] = rangedData[start + j];
             
 
-            
+            for (int i = 0; i < currentBlockSize; i++)
+            {
+                printf("%d %d %d %c %d %d\n", rangedBlock[i].isLL, rangedBlock[i].haffLen, rangedBlock[i].haffCode, rangedBlock[i].haffCode, rangedBlock[i].extraLen, rangedBlock[i].extraVal);
+            }   
             printf("block readed, size = %zu\n", currentBlockSize);
 
             printf("counting frequencies\n");
             LLfrequencies = calloc(LIT, sizeof(unsigned));
-            Ofrequencies  = calloc(DIST, sizeof(unsigned));
+            Ofrequencies = calloc(DIST, sizeof(unsigned));
+            memset(LLfrequencies, 0, LIT);
+            memset(Ofrequencies, 0, DIST);
             count_frequencies(rangedBlock, LLfrequencies, Ofrequencies, currentBlockSize);
+            printf("L/L:\n");
+            for (int j = 0 ; j < LIT; j++)
+            {
+                if (LLfrequencies[j] != 0)
+                {
+                    printf("%d: %d, ", j, LLfrequencies[j]);
+                }
+            }
+            printf("\nDistances: \n");
 
+            for (int j = 0 ; j < DIST; j++)
+            {
+                if (Ofrequencies[j] != 0)
+                {
+                    printf("%d: %d, ",j,  Ofrequencies[j]);
+                }
+            }
+            printf("\n");
             
             printf("building trees\n");
             headLL = build_tree(LLfrequencies, LIT);
             headO  = build_tree(Ofrequencies, DIST);
 
-            
 
             codeLengths = calloc(LDIST, sizeof(unsigned));
-
+            getLenghtsCodeLengths(codeLengths, headLL, 0);
+            getLenghtsCodeLengths(codeLengths + 288, headO, 0);
 
             maxlen = 0, pos = 0;
-            count_code_length(codeLenFreq, headLL, headO, &maxlen, codeLengths, &pos);
-
+            printf("print lengths:\n");
+            
             printf("repeats compression\n"); 
             shortedLengths = calloc(LDIST, sizeof(struct shortedLength));
-            repeats_compression(codeLengths, shortedLengths, LDIST, &shorted_count);
             
+            repeats_compression(codeLengths, shortedLengths, LDIST, &shorted_count);
+            for (int j = 0; j < shorted_count ; j++)
+            {
+                printf("data: %u extra: %u\n", shortedLengths[j].data, shortedLengths[j].extra_bits);
+            }
+            printf("\n");
             codes = calloc(LDIST , sizeof(uint16_t));
 
 
 
             printf("making canonical codes\n");
             makeCanonicalCodes(codeLengths, LDIST, codes);
-
-            
+            for (int j = 0; j < LDIST ; j++)
+            {
+                if (codes[j] != 0)
+                printf("codeLength: %u code: %u\n", j, codes[j]);
+            }
+            printf("\n");
             printf("building length tree\n");
             treesFreq = calloc(19, sizeof(unsigned));
             count_frequencies_for_lengths(shortedLengths, treesFreq, shorted_count);
@@ -713,6 +802,7 @@ void compress_directory(char *filename, uint8_t *archiv, struct bitWriter *write
 
             memset(lengthsOfLengths, 0, sizeof(lengthsOfLengths));
             getLenghtsCodeLengths(lengthsOfLengths, headTrees, 0);
+            
 
 
 
@@ -724,20 +814,12 @@ void compress_directory(char *filename, uint8_t *archiv, struct bitWriter *write
             printf("writing data\n");
             write_header(&bufWriter, buffer, end);
             write_lengths_of_lengths(tree_codes, lengthsOfLengths, &bufWriter, buffer); 
-            for (size_t i = 0 ; i < 318; i++)
+            for (size_t i = 0 ; i < 19; i++)
             {
                 printf("%d\t%d\n", lengthsOfLengths[i], tree_codes[i]);
             }
             encode_lengths(shortedLengths, shorted_count, tree_codes, lengthsOfLengths, buffer, &bufWriter);
-            for (size_t i = 0 ; i < 318; i++)
-            {
-                printf("%d\t%d\n", shortedLengths->data, codes[i]);
-            }
-            encode_range_data(rangedBlock, currentBlockSize, buffer, headLL, headO, &bufWriter);
-            if (end)
-            {
-                write_bits(&bufWriter, 256, 8, buffer, 0, 0);
-            }
+            encode_range_data(rangedBlock, currentBlockSize, buffer, &bufWriter, codes, codeLengths);
             flushBuf(buffer, &bufWriter);
             
             

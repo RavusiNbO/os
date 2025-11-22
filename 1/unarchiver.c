@@ -54,6 +54,7 @@ void decode_trees(uint8_t *archiv, struct bitReader *reader, unsigned *codeLengt
     {
         c = 0;
         br = false;
+        buffer = 0;
         while(!br)
         {
             buffer |= br_read_bits(reader, archiv, 1) << c++;
@@ -447,7 +448,7 @@ void parseLO(struct rangedData *rangedData, size_t rangedDataSize, struct match 
                     break;
             }
             matches[*matchesSize].offset = trueVal;
-            *matchesSize++;
+            (*matchesSize)++;
         }
         else{
             matches[*matchesSize].type = LITERAL;
@@ -521,29 +522,31 @@ void decompress(struct bitReader *reader, uint8_t * archiv, struct fileTree* hea
             treesCodelengths[alphabet[i]] = br_read_bits(reader, archiv, 3);
         }
 
-        printf("making canonical codes\n");
+        
         for (int i = 0 ; i < 19; i++)
         {
-            printf("%d\n", treesCodelengths[i]);
+            printf("treescodelengths: %d\n", treesCodelengths[i]);
         }
         makeCanonicalCodes(treesCodelengths, sizeof(alphabet), treeCodes);
-        printf("decoding trees\n");
+        printf("making canonical codes\n");
         for (int i = 0 ; i < 19; i++)
         {
-            printf("%d\t%d\n", treesCodelengths[i], treeCodes[i]);
+            printf("treescodelengths: %d treeCodes: %d\n", treesCodelengths[i], treeCodes[i]);
         }
+        printf("decoding trees\n");
         decode_trees(archiv, reader, codeLengths, treeCodes);
+        for (int i = 0 ; i < 318; i++)
+        {
+            printf("codeLengths: %d treeCodes: %d\n", codeLengths[i], treeCodes[codeLengths[i]]);
+        }
         printf("making canonical codes\n");
-        for (int i = 0 ; i < 318; i++)
-        {
-            printf("%d\t%d\n", codeLengths[i], codes[i]);
-        }
         makeCanonicalCodes(codeLengths, 318, codes);
-        printf("decoding data\n");
+        
         for (int i = 0 ; i < 318; i++)
         {
-            printf("%d\t%d\n", codeLengths[i], codes[i]);
+            printf("codeLengths: %d codes: %d\n", codeLengths[i], codes[i]);
         }
+        printf("decoding data\n");
         decode_data(reader, archiv, codes, rangedData, &rangedDataSize);
         printf("parsing data\n");
         parseLO(rangedData, rangedDataSize, matches, &matchesSize);
