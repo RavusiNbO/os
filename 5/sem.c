@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/semaphore.h>
+#include <semaphore.h>
 #include <unistd.h>
 
 sem_t accessSem, enterSem, sem[2];
