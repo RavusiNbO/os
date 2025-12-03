@@ -32,11 +32,11 @@ void* student(void* arg)
     printf("[%s] Attempting to enter...\n", (gen == MALE ? "Male" : "Female"));
     fflush(stdout);
 
-    
-
-    sem_wait(&sem[gen]);
     sem_wait(&accessSem);
     sem_post(&accessSem);
+
+    sem_wait(&sem[gen]);
+    
     printf("[%s] count: %u\n", gen == MALE ? "Male" : "Female", peopleCount[gen]);
     fflush(stdout);
 
@@ -52,7 +52,6 @@ void* student(void* arg)
         sem_post(&accessSem);
         
     }
-    
 
     sem_post(&sem[gen]);
     
@@ -64,7 +63,6 @@ void* student(void* arg)
 
 
     sem_wait(&sem[gen]);
-    peopleCount[gen]-=1;
     
     printf("<<< [%s] Leaving room.\n", (gen == MALE ? "Male" : "Female"));
     fflush(stdout);
