@@ -76,11 +76,9 @@ int main(int argc, char **argv)
 
     FILE* f = fopen("output_file.txt", "wb");
     
-    size_t len = (file_sizes[0] < file_sizes[1]) ? file_sizes[0] : file_sizes[1];
-
-    for (size_t i = 0; i < len; i++)
+    for (size_t i = 0; i < file_sizes[0]; i++)
     {
-        fputc(file_buffers[0][i] ^ file_buffers[1][i], f);
+        fputc(file_buffers[0][i] ^ file_buffers[1][i % file_sizes[1]] , f);
     }
 
     fclose(f);

@@ -5,9 +5,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <semaphore.h>
+#include <sys/semaphore.h>
 #include <unistd.h>
 
-sem_t accessSem, enterSem, sem[2];
+sem_t accessSem, enterSem, sem[2], bathSem;
 unsigned peopleCount[2] = {0};
 
 enum gender {
@@ -56,10 +57,11 @@ void* student(void* arg)
     sem_post(&sem[gen]);
     
 
-    
+    sem_wait(&bathSem);
     printf("[%s] Entered room. (Count: %d)\n", (gen == MALE ? "Male" : "Female"), peopleCount[gen]);
     fflush(stdout);
     sleep(1); 
+    sem_post(&bathSem);
 
 
     sem_wait(&sem[gen]);
@@ -98,6 +100,7 @@ int main(int argc, char **argv)
     sem_init(&sem[FEMALE], 0, 1);
     sem_init(&enterSem, 0, 1);
     sem_init(&accessSem, 0, 1);
+    sem_init(&bathSem, 0, 1);
     peopleCount[MALE] = 0;
     peopleCount[FEMALE] = 0;
 
