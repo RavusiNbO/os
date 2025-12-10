@@ -1,0 +1,18 @@
+[
+  {
+    "arguments": [
+      "/usr/bin/gcc",
+      "-c",
+      "-I/usr/local/include/glib-2.0",
+      "-I/usr/local/lib/aarch64-linux-gnu/glib-2.0/include",
+      "-I/usr/local/include",
+      "-pthread",
+      "-o",
+      "main",
+      "6/main.c"
+    ],
+    "directory": "/home/rava/Рабочий стол/dev/os",
+    "file": "/home/rava/Рабочий стол/dev/os/6/main.c",
+    "output": "/home/rava/Рабочий стол/dev/os/main"
+  }
+]
