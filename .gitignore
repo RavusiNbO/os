@@ -7,3 +7,5 @@ archiver
 отчеты
 .vscode/
 unarchiver
+unarchiver_output.txt
+archiver_output.txt

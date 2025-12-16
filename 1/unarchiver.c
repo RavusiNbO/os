@@ -7,18 +7,15 @@ unsigned br_read_bits(struct bitReader *r, const uint8_t *data, size_t nbits)
     unsigned val = 0;
     
     for (size_t i = 0; i < nbits; ++i) {
-        // Если нужно, загружаем новый байт
         if (r->pos == 0) {
             r->buff = data[r->buffPos++];
         }
         
-        
-        // Читаем текущий бит
+
         unsigned bit = (r->buff >> r->pos) & 1u;
         val |= (bit << i);
         
-        // Переходим к следующему биту
-        r->pos = (r->pos + 1) & 7;  // Используем маску для циклического перехода 0-7
+        r->pos = (r->pos + 1) & 7; 
     }
     
     return val;
