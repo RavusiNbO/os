@@ -538,26 +538,23 @@ void delete_tree(struct tree* head) {
 void repeats_compression(unsigned *lengths, struct shortedLength *shorted, size_t size, size_t *shorted_count)
 {
     size_t k = 0;
-    if (size == 0) {
-        *shorted_count = 0;
-        return;
-    }
-
     size_t i = 0;
+
     while (i < size) {
         unsigned val = lengths[i];
         size_t count = 1;
-        
-        // Считаем длину текущей серии одинаковых значений
+
+        // 1. Считаем длину серии одинаковых значений
         while (i + count < size && lengths[i + count] == val) {
             count++;
         }
-        
-        // Сдвигаем индекс на длину серии
+
+        // Сдвигаем основной индекс
         i += count;
 
         if (val == 0) {
-            // Обработка нулей (Коды 17 и 18)
+            // === Обработка нулей (Коды 17 и 18) ===
+            
             // Код 18: 11-138 нулей
             while (count >= 11) {
                 size_t chunk = (count > 138) ? 138 : count;
@@ -572,16 +569,16 @@ void repeats_compression(unsigned *lengths, struct shortedLength *shorted, size_
                 shorted[k++].extra_bits = chunk - 3;
                 count -= chunk;
             }
-            // Оставшиеся нули пишем как есть
+            // Оставшиеся нули (меньше 3) пишем как есть
             while (count > 0) {
                 shorted[k++].data = 0;
                 count--;
             }
         } else {
-            // Обработка ненулевых значений (Литерал + Код 16)
-            
-            // ВАЖНО: Код 16 копирует ПРЕДЫДУЩИЙ элемент.
-            // Поэтому сначала мы должны записать само значение один раз.
+            // === Обработка значений (Литерал + Код 16) ===
+
+            // ВАЖНО: Сначала пишем сам символ (Литерал), 
+            // чтобы коду 16 было что копировать.
             shorted[k++].data = val;
             count--;
 
@@ -592,7 +589,7 @@ void repeats_compression(unsigned *lengths, struct shortedLength *shorted, size_
                 shorted[k++].extra_bits = chunk - 3;
                 count -= chunk;
             }
-            // Оставшиеся повторы пишем как литералы
+            // Оставшиеся повторы (меньше 3) пишем как литералы
             while (count > 0) {
                 shorted[k++].data = val;
                 count--;

@@ -540,10 +540,6 @@ void decompress(struct bitReader *reader, uint8_t * archiv, struct fileTree* hea
     uint8_t *fileData;
     bool end = false;
 
-    if (reader->pos != 0) {
-        reader->buffPos++;
-        reader->pos = 0;
-    }
     printf("isDir: %d\npath: %s\nchildsCount: %d\n", head->isDir, head->path, head->childsCount);
     if (head->isDir)
     {
@@ -559,6 +555,10 @@ void decompress(struct bitReader *reader, uint8_t * archiv, struct fileTree* hea
 
     for (int i = 0 ; i < head->blockCount; i++)
     { 
+        if (i > 0 && reader->pos != 0) {
+            reader->buffPos++;
+            reader->pos = 0;
+        }
         rangedData = calloc(2000, sizeof(struct rangedData));
         matches = calloc(2000, sizeof(struct match));
         fileData = malloc(10 * 1024 * 1024);
