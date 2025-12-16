@@ -544,52 +544,44 @@ void repeats_compression(unsigned *lengths, struct shortedLength *shorted, size_
         unsigned val = lengths[i];
         size_t count = 1;
 
-        // 1. Считаем длину серии одинаковых значений
+        // Считаем длину серии
         while (i + count < size && lengths[i + count] == val) {
             count++;
         }
-
-        // Сдвигаем основной индекс
         i += count;
 
         if (val == 0) {
-            // === Обработка нулей (Коды 17 и 18) ===
-            
-            // Код 18: 11-138 нулей
+            // Нули
             while (count >= 11) {
                 size_t chunk = (count > 138) ? 138 : count;
                 shorted[k].data = 18;
                 shorted[k++].extra_bits = chunk - 11;
                 count -= chunk;
             }
-            // Код 17: 3-10 нулей
             while (count >= 3) {
                 size_t chunk = (count > 10) ? 10 : count;
                 shorted[k].data = 17;
                 shorted[k++].extra_bits = chunk - 3;
                 count -= chunk;
             }
-            // Оставшиеся нули (меньше 3) пишем как есть
             while (count > 0) {
                 shorted[k++].data = 0;
                 count--;
             }
         } else {
-            // === Обработка значений (Литерал + Код 16) ===
-
-            // ВАЖНО: Сначала пишем сам символ (Литерал), 
-            // чтобы коду 16 было что копировать.
+            // Значения
+            // 1. Сначала пишем само значение (обязательно!)
             shorted[k++].data = val;
             count--;
 
-            // Теперь используем код 16 для повторов (3-6 раз за код)
+            // 2. Копируем его кодом 16
             while (count >= 3) {
                 size_t chunk = (count > 6) ? 6 : count;
                 shorted[k].data = 16;
                 shorted[k++].extra_bits = chunk - 3;
                 count -= chunk;
             }
-            // Оставшиеся повторы (меньше 3) пишем как литералы
+            // 3. Остатки пишем как литералы
             while (count > 0) {
                 shorted[k++].data = val;
                 count--;
