@@ -47,34 +47,47 @@ void read_file_tree(struct fileTree **head, uint8_t *archiv, struct bitReader *r
 
 
 // Добавили аргумент treesCodeLengths
-void decode_trees(uint8_t *archiv, struct bitReader *reader, unsigned *codeLengths, uint16_t *treeCodes, unsigned *treesCodeLengths)
+// Добавили аргумент count (количество кодов для чтения)
+void decode_trees(uint8_t *archiv, struct bitReader *reader, unsigned *codeLengths, uint16_t *treeCodes, unsigned *treesCodeLengths, size_t count)
 {
     uint16_t buffer = 0;
     size_t c;
     bool br = false;
     uint8_t extraValue = 0;
-    unsigned prevValue = 0; // Инициализация важна
+    unsigned prevValue = 0;
 
-    for (size_t i = 0; i < HLIT + HDIST; ) // Используем i < HLIT + HDIST вместо 318 для точности, но 318 тоже ок
+    // Цикл работает пока i < count (318), а не HLIT+HDIST
+    for (size_t i = 0; i < count; ) 
     {
         c = 0;
         br = false;
         buffer = 0;
+        
+        // Защита от выхода за пределы массива codeLengths
+        if (i >= count) break;
+
         while(!br)
         {
             // Читаем по одному биту
             buffer |= br_read_bits(reader, archiv, 1) << c++;
             
+            // ЗАЩИТА ОТ SEGFAULT:
+            // Если длина кода превышает максимальную глубину (например, 15), 
+            // значит дерево сломано или данные битые. Прерываем, чтобы не читать память вечно.
+            if (c > 16) {
+                printf("Error: Code length exceeded max limit in decode_trees. Data corrupted.\n");
+                return; 
+            }
+
             for (size_t j = 0; j < 19; j++)
             {
-                // ИСПРАВЛЕНИЕ: Проверяем, что длина кода (c) совпадает с ожидаемой длиной для этого символа
-                // И проверяем, что длина не 0 (символ существует)
                 if (treesCodeLengths[j] != 0 && buffer == treeCodes[j] && c == treesCodeLengths[j])
                 {
-                    // Логика обработки повторов (16, 17, 18) и обычных длин
                     if (j < 16) {
-                        codeLengths[i++] = j;
-                        prevValue = j;
+                        if (i < count) { // Проверка границ
+                            codeLengths[i++] = j;
+                            prevValue = j;
+                        }
                     }
                     else if (j == 16)
                     {
@@ -82,7 +95,8 @@ void decode_trees(uint8_t *archiv, struct bitReader *reader, unsigned *codeLengt
                         size_t repeat = 3 + extraValue;
                         for (size_t k = 0; k < repeat; k++)
                         {
-                            codeLengths[i++] = prevValue;
+                            if (i < count) // Проверка границ внутри цикла повтора
+                                codeLengths[i++] = prevValue;
                         }
                     }
                     else if (j == 17)
@@ -91,7 +105,8 @@ void decode_trees(uint8_t *archiv, struct bitReader *reader, unsigned *codeLengt
                         size_t repeat = 3 + extraValue;
                         for (size_t k = 0; k < repeat; k++)
                         {
-                            codeLengths[i++] = 0;
+                            if (i < count) // Проверка границ
+                                codeLengths[i++] = 0;
                         }
                         prevValue = 0;
                     }
@@ -101,13 +116,14 @@ void decode_trees(uint8_t *archiv, struct bitReader *reader, unsigned *codeLengt
                         size_t repeat = 11 + extraValue;
                         for (size_t k = 0; k < repeat; k++)
                         {
-                            codeLengths[i++] = 0;
+                            if (i < count) // Проверка границ
+                                codeLengths[i++] = 0;
                         }
                         prevValue = 0;
                     }
                     
                     br = true;
-                    break; // Важно выйти из цикла for
+                    break;
                 }
             }
         }
@@ -569,7 +585,7 @@ void decompress(struct bitReader *reader, uint8_t * archiv, struct fileTree* hea
             printf("treescodelengths: %d treeCodes: %d\n", treesCodelengths[i], treeCodes[i]);
         }
         printf("decoding trees\n");
-        decode_trees(archiv, reader, codeLengths, treeCodes, treesCodelengths);
+        decode_trees(archiv, reader, codeLengths, treeCodes, treesCodelengths, 318);
         for (int i = 0 ; i < 318; i++)
         {
             printf("codeLengths[%d]: %d treeCodes[%d]: %d\n", i, codeLengths[i], i, treeCodes[codeLengths[i]]);
