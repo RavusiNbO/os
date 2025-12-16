@@ -855,11 +855,14 @@ void compress_directory(char *filename, uint8_t *archiv, struct bitWriter *write
             write_lengths_of_lengths(lengthsOfLengths, &bufWriter, buffer); 
             for (size_t i = 0 ; i < 19; i++)
             {
-                printf("lengthsoflengths[%d]: %u\ttree_codes[%d]: %u\n", i, lengthsOfLengths[i], i, tree_codes[i]);
+                printf("lengthsoflengths[%zu]: %u\ttree_codes[%zu]: %u\n", i, lengthsOfLengths[i], i, tree_codes[i]);
             }
             encode_lengths(shortedLengths, shorted_count, tree_codes, lengthsOfLengths, buffer, &bufWriter);
             encode_range_data(rangedBlock, currentBlockSize, buffer, &bufWriter, codes, codeLengths);
-            flushBuf(buffer, &bufWriter);
+            // Записываем последний байт, если есть незаписанные биты
+            if (bufWriter.pos > 0) {
+                flushBuf(buffer, &bufWriter);
+            }
             
             
             delete_tree(headTrees);
@@ -893,12 +896,14 @@ void compress_directory(char *filename, uint8_t *archiv, struct bitWriter *write
 
         size_t startWriterPos = (*writer).buffPos;
 
+        // Копируем данные из локального буфера в архив
         for (size_t k = 0; k < bufWriter.buffPos; ++k) {
             archiv[startWriterPos + k] = buffer[k];
         }
 
         (*writer).buffPos += bufWriter.buffPos;
-        flushBuf(archiv, writer);
+        // Не вызываем flushBuf здесь, так как мы уже скопировали все данные
+        // flushBuf(archiv, writer);
         free(buffer);
         c = 0;
         
