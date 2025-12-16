@@ -21,6 +21,19 @@ unsigned br_read_bits(struct bitReader *r, const uint8_t *data, size_t nbits)
     return val;
 }
 
+// Чтение одного бита в MSB-first порядке (для кодов Хаффмана)
+unsigned br_read_bit_msb(struct bitReader *r, const uint8_t *data)
+{
+    if (r->pos == 0) {
+        r->buff = data[r->buffPos++];
+    }
+    
+    unsigned bit = (r->buff >> r->pos) & 1u;
+    r->pos = (r->pos + 1) & 7;
+    
+    return bit;
+}
+
 void read_file_tree(struct fileTree **head, uint8_t *archiv, struct bitReader *reader)
 {
     *head = malloc(sizeof(struct fileTree));
@@ -68,8 +81,8 @@ void decode_trees(uint8_t *archiv, struct bitReader *reader, unsigned *codeLengt
 
         while(!br)
         {
-            // ИЗМЕНЕНИЕ: Читаем бит и добавляем его в конец буфера (сдвиг влево)
-            unsigned bit = br_read_bits(reader, archiv, 1);
+            // Читаем бит в MSB-first порядке (как записано в write_huffman_msb)
+            unsigned bit = br_read_bit_msb(reader, archiv);
             buffer = (buffer << 1) | bit;
             c++;
             
@@ -145,7 +158,10 @@ void decode_data(struct bitReader *reader, uint8_t *archiv, uint16_t *codes, uns
         bool found = false;
 
         while (!found) {
-            buffer |= br_read_bits(reader, archiv, 1) << len++;
+            // Читаем бит в MSB-first порядке (коды записаны через write_huffman_msb)
+            unsigned bit = br_read_bit_msb(reader, archiv);
+            buffer = (buffer << 1) | bit;
+            len++;
             
             for (size_t i = 0; i < 318; i++)
             {
@@ -158,135 +174,48 @@ void decode_data(struct bitReader *reader, uint8_t *archiv, uint16_t *codes, uns
                         break;
                     }
 
-                    // ... ВАША ЛОГИКА ЗАПОЛНЕНИЯ rangedData (без изменений) ...
-                    // Копируйте сюда ваш switch/if блок обработки rangedData[*size]
-                    // от if (i < 256) до конца обработки кодов.
-                    
-                    rangedData[*size].haffCode = i;
-                    rangedData[*size].isLL = true;
-                    rangedData[*size].haffLen = len;
-                    if (i == 285){
-                    rangedData[*size].extraVal = 0;
-                    rangedData[*size].extraLen = 0;
-                    }
-                    else if (i > 256 && i < 285)
-                    {
-                        rangedData[*size].extraLen = 0;
+                    // Определяем количество extra bits на основе кода
+                    uint8_t extraBits = 0;
+                    if (i < 256) {
+                        // Литерал - нет extra bits
+                        rangedData[*size].haffCode = i;
+                        rangedData[*size].isLL = true;
+                        rangedData[*size].haffLen = len;
                         rangedData[*size].extraVal = 0;
-                        
-                        if (i > 264)
-                        {
-                            extraValue = br_read_bits(reader, archiv, 1);
-                            rangedData[*size].extraVal = extraValue;
-                            rangedData[*size].extraLen = 1;
+                        rangedData[*size].extraLen = 0;
+                    } else if (i > 256 && i <= 285) {
+                        // Код длины (257-285)
+                        rangedData[*size].haffCode = i;
+                        rangedData[*size].isLL = true;
+                        rangedData[*size].haffLen = len;
+                        // Определяем количество extra bits для кодов длины
+                        static const uint8_t length_extras[] = {
+                            0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0
+                        };
+                        extraBits = length_extras[i - 257];
+                        rangedData[*size].extraLen = extraBits;
+                        if (extraBits > 0) {
+                            rangedData[*size].extraVal = br_read_bits(reader, archiv, extraBits);
+                        } else {
+                            rangedData[*size].extraVal = 0;
                         }
-                        if (i > 268)
-                        {
-                            extraValue = br_read_bits(reader, archiv, 1);
-                            rangedData[*size].extraVal = extraValue;
-                            rangedData[*size].extraLen = 2;
-                        }
-                        if (i > 272)
-                        {
-                            extraValue = br_read_bits(reader, archiv, 1);
-                            rangedData[*size].extraVal = extraValue;
-                            rangedData[*size].extraLen = 3;
-                        }
-                        if (i > 276)
-                        {
-                            extraValue = br_read_bits(reader, archiv, 1);
-                            rangedData[*size].extraVal = extraValue;
-                            rangedData[*size].extraLen = 4;
-                        }
-                        if (i > 280)
-                        {
-                            extraValue = br_read_bits(reader, archiv, 1);
-                            rangedData[*size].extraVal = extraValue;
-                            rangedData[*size].extraLen = 5;
-                        }
-                    }
-                    else if (i > 285)
-                    {
+                    } else if (i >= 288) {
+                        // Код расстояния (i от 288 до 317, что соответствует кодам 0-29)
+                        uint16_t dist_code = i - 288;
+                        rangedData[*size].haffCode = i;
                         rangedData[*size].isLL = false;
-                        if (i > 289)
-                        {
-                            extraValue = br_read_bits(reader, archiv, 1);
-                            rangedData[*size].extraVal = extraValue;
-                            rangedData[*size].extraLen = 1;
+                        rangedData[*size].haffLen = len;
+                        // Определяем количество extra bits для кодов расстояния
+                        static const uint8_t dist_extras[] = {
+                            0,0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13
+                        };
+                        extraBits = dist_extras[dist_code];
+                        rangedData[*size].extraLen = extraBits;
+                        if (extraBits > 0) {
+                            rangedData[*size].extraVal = br_read_bits(reader, archiv, extraBits);
+                        } else {
+                            rangedData[*size].extraVal = 0;
                         }
-                        if (i > 291)
-                        {
-                            extraValue = br_read_bits(reader, archiv, 1);
-                            rangedData[*size].extraVal = extraValue;
-                            rangedData[*size].extraLen = 2;
-                        }
-                        if (i > 293)
-                        {
-                            extraValue = br_read_bits(reader, archiv, 1);
-                            rangedData[*size].extraVal = extraValue;
-                            rangedData[*size].extraLen = 3;
-                        }
-                        if (i > 295)
-                        {
-                            extraValue = br_read_bits(reader, archiv, 1);
-                            rangedData[*size].extraVal = extraValue;
-                            rangedData[*size].extraLen = 4;
-                        }
-                        if (i > 297)
-                        {
-                            extraValue = br_read_bits(reader, archiv, 1);
-                            rangedData[*size].extraVal = extraValue;
-                            rangedData[*size].extraLen = 5;
-                        }
-                        if (i > 299)
-                        {
-                            extraValue = br_read_bits(reader, archiv, 1);
-                            rangedData[*size].extraVal = extraValue;
-                            rangedData[*size].extraLen = 6;
-                        }
-                        if (i > 301)
-                        {
-                            extraValue = br_read_bits(reader, archiv, 1);
-                            rangedData[*size].extraVal = extraValue;
-                            rangedData[*size].extraLen = 7;
-                        }
-                        if (i > 303)
-                        {
-                            extraValue = br_read_bits(reader, archiv, 1);
-                            rangedData[*size].extraVal = extraValue;
-                            rangedData[*size].extraLen = 8;
-                        }
-                        if (i > 305)
-                        {
-                            extraValue = br_read_bits(reader, archiv, 1);
-                            rangedData[*size].extraVal = extraValue;
-                            rangedData[*size].extraLen = 9;
-                        }
-                        if (i > 307)
-                        {
-                            extraValue = br_read_bits(reader, archiv, 1);
-                            rangedData[*size].extraVal = extraValue;
-                            rangedData[*size].extraLen = 10;
-                        }
-                        if (i > 309)
-                        {
-                            extraValue = br_read_bits(reader, archiv, 1);
-                            rangedData[*size].extraVal = extraValue;
-                            rangedData[*size].extraLen = 11;
-                        }
-                        if (i > 311)
-                        {
-                            extraValue = br_read_bits(reader, archiv, 1);
-                            rangedData[*size].extraVal = extraValue;
-                            rangedData[*size].extraLen = 12;
-                        }
-                        if (i > 313)
-                        {
-                            extraValue = br_read_bits(reader, archiv, 1);
-                            rangedData[*size].extraVal = extraValue;
-                            rangedData[*size].extraLen = 13;
-                        }
-
                     }
                     extraValue = 0;
                     buffer = 0;
