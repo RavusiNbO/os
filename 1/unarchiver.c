@@ -538,7 +538,7 @@ void decompress(struct bitReader *reader, uint8_t * archiv, struct fileTree* hea
         decode_trees(archiv, reader, codeLengths, treeCodes);
         for (int i = 0 ; i < 318; i++)
         {
-            printf("codeLengths: %d treeCodes: %d\n", codeLengths[i], treeCodes[codeLengths[i]]);
+            printf("codeLengths[%d]: %d treeCodes[%d]: %d\n", i, codeLengths[i], i, treeCodes[codeLengths[i]]);
         }
         printf("making canonical codes\n");
         makeCanonicalCodes(codeLengths, 318, codes);

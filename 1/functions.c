@@ -718,6 +718,9 @@ void compress_directory(char *filename, uint8_t *archiv, struct bitWriter *write
         lastBlockSize = sizeData % BLOCK_SIZE;
         if (lastBlockSize == 0) lastBlockSize = BLOCK_SIZE;
         buffer = malloc(BLOCK_SIZE * 100000);
+        bufWriter.buffPos = 0;
+        bufWriter.pos = 0;
+        bufWriter.buff = 0;
         curNode->blockCount = blocksNumber;
         while(!end)
         {
@@ -796,7 +799,7 @@ void compress_directory(char *filename, uint8_t *archiv, struct bitWriter *write
             for (int j = 0; j < LDIST ; j++)
             {
                 if (codes[j] != 0)
-                printf("codeLength: %u code: %u\n", j, codes[j]);
+                printf("codeLengths[%d]: %u codes[%d]: %u\n", j, codeLengths[j], j, codes[j]);
             }
             printf("\n");
             printf("building length tree\n");
@@ -824,39 +827,25 @@ void compress_directory(char *filename, uint8_t *archiv, struct bitWriter *write
             write_lengths_of_lengths(lengthsOfLengths, &bufWriter, buffer); 
             for (size_t i = 0 ; i < 19; i++)
             {
-                printf("lengthsoflengths[%d]: %u\ttree_codes[%d]: %u\n", lengthsOfLengths[i], tree_codes[i]);
+                printf("lengthsoflengths[%d]: %u\ttree_codes[%d]: %u\n", i, lengthsOfLengths[i], i, tree_codes[i]);
             }
             encode_lengths(shortedLengths, shorted_count, tree_codes, lengthsOfLengths, buffer, &bufWriter);
             encode_range_data(rangedBlock, currentBlockSize, buffer, &bufWriter, codes, codeLengths);
             flushBuf(buffer, &bufWriter);
             
             
-            printf("cleaning memory\n");
-            printf("cleaning 1\n");
             delete_tree(headTrees);
-            printf("cleaning 2\n");
             delete_tree(headLL);
-            printf("cleaning 3\n");
             delete_tree(headO);
-            printf("cleaning 4\n");
             free(LLfrequencies);
-            printf("cleaning 5\n");
             free(Ofrequencies);
-            printf("cleaning 6\n");
             free(codeLengths);
-            printf("cleaning 7\n");
             free(rangedBlock);
-            printf("cleaning 8\n");
             memset(codeLenFreq, 0, sizeof(codeLenFreq));
-            printf("cleaning 9\n");
             free(treesFreq);
-            printf("cleaning 10\n");
             free(tree_codes);
-            printf("cleaning 11\n");
             free(shortedLengths);
-            printf("cleaning 12\n");
             memset(lengthsOfLengths, 0, sizeof(lengthsOfLengths));
-            printf("cleaning 13\n");
             free(codes);
             printf("mem cleaned\n");
 
@@ -874,17 +863,18 @@ void compress_directory(char *filename, uint8_t *archiv, struct bitWriter *write
         printf("file mem cleaned\n");
 
 
-        size_t roof = (*writer).buffPos + bufWriter.buffPos;
-        for (size_t k = (*writer).buffPos; k < roof; ++k) {
-            archiv[k] = buffer[k - (*writer).buffPos];
-            (*writer).buffPos++;
+        size_t startWriterPos = (*writer).buffPos;
+
+        for (size_t k = 0; k < bufWriter.buffPos; ++k) {
+            archiv[startWriterPos + k] = buffer[k];
         }
+
+        (*writer).buffPos += bufWriter.buffPos;
         flushBuf(archiv, writer);
         free(buffer);
         c = 0;
         
         printf("====================\n");
-        exit(0);
     }
 
 
