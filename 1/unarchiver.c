@@ -46,213 +46,247 @@ void read_file_tree(struct fileTree **head, uint8_t *archiv, struct bitReader *r
 }
 
 
-void decode_trees(uint8_t *archiv, struct bitReader *reader, unsigned *codeLengths, uint16_t *treeCodes)
+// Добавили аргумент treesCodeLengths
+void decode_trees(uint8_t *archiv, struct bitReader *reader, unsigned *codeLengths, uint16_t *treeCodes, unsigned *treesCodeLengths)
 {
     uint16_t buffer = 0;
     size_t c;
     bool br = false;
     uint8_t extraValue = 0;
-    unsigned prevValue;
+    unsigned prevValue = 0; // Инициализация важна
 
-    for (size_t i = 0; i < 318; i++)
+    for (size_t i = 0; i < HLIT + HDIST; ) // Используем i < HLIT + HDIST вместо 318 для точности, но 318 тоже ок
     {
         c = 0;
         br = false;
         buffer = 0;
         while(!br)
         {
+            // Читаем по одному биту
             buffer |= br_read_bits(reader, archiv, 1) << c++;
+            
             for (size_t j = 0; j < 19; j++)
             {
-                if (buffer == treeCodes[j])
+                // ИСПРАВЛЕНИЕ: Проверяем, что длина кода (c) совпадает с ожидаемой длиной для этого символа
+                // И проверяем, что длина не 0 (символ существует)
+                if (treesCodeLengths[j] != 0 && buffer == treeCodes[j] && c == treesCodeLengths[j])
                 {
-                    codeLengths[i] = j;
-                    prevValue = buffer;
-                    br = true;
-                    c = 0;
-                    if (buffer == 17)
-                    {
-                        extraValue = br_read_bits(reader, archiv, 3);
-                        for ( ; i < i + extraValue; i++)
-                        {
-                            codeLengths[i] = 0;
-                        }
-                        prevValue = 0;
-                        break;
+                    // Логика обработки повторов (16, 17, 18) и обычных длин
+                    if (j < 16) {
+                        codeLengths[i++] = j;
+                        prevValue = j;
                     }
-                    if (buffer == 18)
-                    {
-                        extraValue = br_read_bits(reader, archiv, 7);
-                        for ( ; i < i + extraValue; i++)
-                        {
-                            codeLengths[i] = 0;
-                        }
-                        prevValue = 0;
-                        break;
-                    }
-                    if (buffer == 16)
+                    else if (j == 16)
                     {
                         extraValue = br_read_bits(reader, archiv, 2);
-                        for ( ; i < i + extraValue + 3; i++)
+                        size_t repeat = 3 + extraValue;
+                        for (size_t k = 0; k < repeat; k++)
                         {
-                            codeLengths[i] = prevValue;
+                            codeLengths[i++] = prevValue;
                         }
-                        break;
                     }
-                    prevValue = buffer;
-
+                    else if (j == 17)
+                    {
+                        extraValue = br_read_bits(reader, archiv, 3);
+                        size_t repeat = 3 + extraValue;
+                        for (size_t k = 0; k < repeat; k++)
+                        {
+                            codeLengths[i++] = 0;
+                        }
+                        prevValue = 0;
+                    }
+                    else if (j == 18)
+                    {
+                        extraValue = br_read_bits(reader, archiv, 7);
+                        size_t repeat = 11 + extraValue;
+                        for (size_t k = 0; k < repeat; k++)
+                        {
+                            codeLengths[i++] = 0;
+                        }
+                        prevValue = 0;
+                    }
+                    
+                    br = true;
+                    break; // Важно выйти из цикла for
                 }
             }
         }
     }
 }
 
-void decode_data(struct bitReader *reader, uint8_t *archiv, uint16_t *codes, struct rangedData *rangedData, size_t *size)
+void decode_data(struct bitReader *reader, uint8_t *archiv, uint16_t *codes, unsigned *codeLengths, struct rangedData *rangedData, size_t *size)
 {
     uint16_t buffer = 0;
     uint16_t len = 0;
     uint8_t extraValue = 0;
-    while (buffer != 256)
+    
+    // Добавляем аргумент codeLengths в сигнатуру функции в archiver.h, если его там нет, 
+    // но в коде выше он не использовался для проверки. 
+    // В вашем коде выше codeLengths НЕ передавался в decode_data, 
+    // но он необходим для декодирования.
+    
+    bool blockEnd = false;
+
+    while (!blockEnd)
     {
-        buffer = br_read_bits(reader, archiv, 1);
-        len++;
-        for (size_t i = 0; i < 318; i++)
-        {
-            if (buffer == codes[i])
+        buffer = 0;
+        len = 0;
+        bool found = false;
+
+        while (!found) {
+            buffer |= br_read_bits(reader, archiv, 1) << len++;
+            
+            for (size_t i = 0; i < 318; i++)
             {
-                rangedData[*size].haffCode = i;
-                rangedData[*size].isLL = true;
-                rangedData[*size].haffLen = len;
-                if (i == 285){
-                    rangedData[*size].extraVal = 0;
-                    rangedData[*size].extraLen = 0;
-                }
-                else if (i > 256 && i < 285)
+                // ИСПРАВЛЕНИЕ: Проверяем длину кода и что код существует (длина > 0)
+                if (codeLengths[i] != 0 && buffer == codes[i] && len == codeLengths[i])
                 {
-                    rangedData[*size].extraLen = 0;
-                    rangedData[*size].extraVal = 0;
-                    if (i > 264)
-                    {
-                        extraValue = br_read_bits(reader, archiv, 1);
-                        rangedData[*size].extraVal = extraValue;
-                        rangedData[*size].extraLen = 1;
-                    }
-                    if (i > 268)
-                    {
-                        extraValue = br_read_bits(reader, archiv, 1);
-                        rangedData[*size].extraVal = extraValue;
-                        rangedData[*size].extraLen = 2;
-                    }
-                    if (i > 272)
-                    {
-                        extraValue = br_read_bits(reader, archiv, 1);
-                        rangedData[*size].extraVal = extraValue;
-                        rangedData[*size].extraLen = 3;
-                    }
-                    if (i > 276)
-                    {
-                        extraValue = br_read_bits(reader, archiv, 1);
-                        rangedData[*size].extraVal = extraValue;
-                        rangedData[*size].extraLen = 4;
-                    }
-                    if (i > 280)
-                    {
-                        extraValue = br_read_bits(reader, archiv, 1);
-                        rangedData[*size].extraVal = extraValue;
-                        rangedData[*size].extraLen = 5;
-                    }
-                }
-                else if (i > 285)
-                {
-                    rangedData[*size].isLL = false;
-                    if (i > 289)
-                    {
-                        extraValue = br_read_bits(reader, archiv, 1);
-                        rangedData[*size].extraVal = extraValue;
-                        rangedData[*size].extraLen = 1;
-                    }
-                    if (i > 291)
-                    {
-                        extraValue = br_read_bits(reader, archiv, 1);
-                        rangedData[*size].extraVal = extraValue;
-                        rangedData[*size].extraLen = 2;
-                    }
-                    if (i > 293)
-                    {
-                        extraValue = br_read_bits(reader, archiv, 1);
-                        rangedData[*size].extraVal = extraValue;
-                        rangedData[*size].extraLen = 3;
-                    }
-                    if (i > 295)
-                    {
-                        extraValue = br_read_bits(reader, archiv, 1);
-                        rangedData[*size].extraVal = extraValue;
-                        rangedData[*size].extraLen = 4;
-                    }
-                    if (i > 297)
-                    {
-                        extraValue = br_read_bits(reader, archiv, 1);
-                        rangedData[*size].extraVal = extraValue;
-                        rangedData[*size].extraLen = 5;
-                    }
-                    if (i > 299)
-                    {
-                        extraValue = br_read_bits(reader, archiv, 1);
-                        rangedData[*size].extraVal = extraValue;
-                        rangedData[*size].extraLen = 6;
-                    }
-                    if (i > 301)
-                    {
-                        extraValue = br_read_bits(reader, archiv, 1);
-                        rangedData[*size].extraVal = extraValue;
-                        rangedData[*size].extraLen = 7;
-                    }
-                    if (i > 303)
-                    {
-                        extraValue = br_read_bits(reader, archiv, 1);
-                        rangedData[*size].extraVal = extraValue;
-                        rangedData[*size].extraLen = 8;
-                    }
-                    if (i > 305)
-                    {
-                        extraValue = br_read_bits(reader, archiv, 1);
-                        rangedData[*size].extraVal = extraValue;
-                        rangedData[*size].extraLen = 9;
-                    }
-                    if (i > 307)
-                    {
-                        extraValue = br_read_bits(reader, archiv, 1);
-                        rangedData[*size].extraVal = extraValue;
-                        rangedData[*size].extraLen = 10;
-                    }
-                    if (i > 309)
-                    {
-                        extraValue = br_read_bits(reader, archiv, 1);
-                        rangedData[*size].extraVal = extraValue;
-                        rangedData[*size].extraLen = 11;
-                    }
-                    if (i > 311)
-                    {
-                        extraValue = br_read_bits(reader, archiv, 1);
-                        rangedData[*size].extraVal = extraValue;
-                        rangedData[*size].extraLen = 12;
-                    }
-                    if (i > 313)
-                    {
-                        extraValue = br_read_bits(reader, archiv, 1);
-                        rangedData[*size].extraVal = extraValue;
-                        rangedData[*size].extraLen = 13;
+                    found = true;
+                    if (i == 256) {
+                        blockEnd = true;
+                        break;
                     }
 
+                    // ... ВАША ЛОГИКА ЗАПОЛНЕНИЯ rangedData (без изменений) ...
+                    // Копируйте сюда ваш switch/if блок обработки rangedData[*size]
+                    // от if (i < 256) до конца обработки кодов.
+                    
+                    rangedData[*size].haffCode = i;
+                    rangedData[*size].isLL = true;
+                    rangedData[*size].haffLen = len;
+                    if (i == 285){
+                    rangedData[*size].extraVal = 0;
+                    rangedData[*size].extraLen = 0;
+                    }
+                    else if (i > 256 && i < 285)
+                    {
+                        rangedData[*size].extraLen = 0;
+                        rangedData[*size].extraVal = 0;
+                        if (i > 264)
+                        {
+                            extraValue = br_read_bits(reader, archiv, 1);
+                            rangedData[*size].extraVal = extraValue;
+                            rangedData[*size].extraLen = 1;
+                        }
+                        if (i > 268)
+                        {
+                            extraValue = br_read_bits(reader, archiv, 1);
+                            rangedData[*size].extraVal = extraValue;
+                            rangedData[*size].extraLen = 2;
+                        }
+                        if (i > 272)
+                        {
+                            extraValue = br_read_bits(reader, archiv, 1);
+                            rangedData[*size].extraVal = extraValue;
+                            rangedData[*size].extraLen = 3;
+                        }
+                        if (i > 276)
+                        {
+                            extraValue = br_read_bits(reader, archiv, 1);
+                            rangedData[*size].extraVal = extraValue;
+                            rangedData[*size].extraLen = 4;
+                        }
+                        if (i > 280)
+                        {
+                            extraValue = br_read_bits(reader, archiv, 1);
+                            rangedData[*size].extraVal = extraValue;
+                            rangedData[*size].extraLen = 5;
+                        }
+                    }
+                    else if (i > 285)
+                    {
+                        rangedData[*size].isLL = false;
+                        if (i > 289)
+                        {
+                            extraValue = br_read_bits(reader, archiv, 1);
+                            rangedData[*size].extraVal = extraValue;
+                            rangedData[*size].extraLen = 1;
+                        }
+                        if (i > 291)
+                        {
+                            extraValue = br_read_bits(reader, archiv, 1);
+                            rangedData[*size].extraVal = extraValue;
+                            rangedData[*size].extraLen = 2;
+                        }
+                        if (i > 293)
+                        {
+                            extraValue = br_read_bits(reader, archiv, 1);
+                            rangedData[*size].extraVal = extraValue;
+                            rangedData[*size].extraLen = 3;
+                        }
+                        if (i > 295)
+                        {
+                            extraValue = br_read_bits(reader, archiv, 1);
+                            rangedData[*size].extraVal = extraValue;
+                            rangedData[*size].extraLen = 4;
+                        }
+                        if (i > 297)
+                        {
+                            extraValue = br_read_bits(reader, archiv, 1);
+                            rangedData[*size].extraVal = extraValue;
+                            rangedData[*size].extraLen = 5;
+                        }
+                        if (i > 299)
+                        {
+                            extraValue = br_read_bits(reader, archiv, 1);
+                            rangedData[*size].extraVal = extraValue;
+                            rangedData[*size].extraLen = 6;
+                        }
+                        if (i > 301)
+                        {
+                            extraValue = br_read_bits(reader, archiv, 1);
+                            rangedData[*size].extraVal = extraValue;
+                            rangedData[*size].extraLen = 7;
+                        }
+                        if (i > 303)
+                        {
+                            extraValue = br_read_bits(reader, archiv, 1);
+                            rangedData[*size].extraVal = extraValue;
+                            rangedData[*size].extraLen = 8;
+                        }
+                        if (i > 305)
+                        {
+                            extraValue = br_read_bits(reader, archiv, 1);
+                            rangedData[*size].extraVal = extraValue;
+                            rangedData[*size].extraLen = 9;
+                        }
+                        if (i > 307)
+                        {
+                            extraValue = br_read_bits(reader, archiv, 1);
+                            rangedData[*size].extraVal = extraValue;
+                            rangedData[*size].extraLen = 10;
+                        }
+                        if (i > 309)
+                        {
+                            extraValue = br_read_bits(reader, archiv, 1);
+                            rangedData[*size].extraVal = extraValue;
+                            rangedData[*size].extraLen = 11;
+                        }
+                        if (i > 311)
+                        {
+                            extraValue = br_read_bits(reader, archiv, 1);
+                            rangedData[*size].extraVal = extraValue;
+                            rangedData[*size].extraLen = 12;
+                        }
+                        if (i > 313)
+                        {
+                            extraValue = br_read_bits(reader, archiv, 1);
+                            rangedData[*size].extraVal = extraValue;
+                            rangedData[*size].extraLen = 13;
+                        }
+
+                    }
+                    extraValue = 0;
+                    buffer = 0;
+                    len = 0;
+                    (*size)++;
+                    break; // Выход из for
                 }
-                extraValue = 0;
-                buffer = 0;
-                len = 0;
-                (*size)++;
             }
         }
     }
 }
+
 
 void parseLO(struct rangedData *rangedData, size_t rangedDataSize, struct match *matches, size_t *matchesSize)
 {
@@ -535,7 +569,7 @@ void decompress(struct bitReader *reader, uint8_t * archiv, struct fileTree* hea
             printf("treescodelengths: %d treeCodes: %d\n", treesCodelengths[i], treeCodes[i]);
         }
         printf("decoding trees\n");
-        decode_trees(archiv, reader, codeLengths, treeCodes);
+        decode_trees(archiv, reader, codeLengths, treeCodes, treesCodelengths);
         for (int i = 0 ; i < 318; i++)
         {
             printf("codeLengths[%d]: %d treeCodes[%d]: %d\n", i, codeLengths[i], i, treeCodes[codeLengths[i]]);
@@ -548,7 +582,7 @@ void decompress(struct bitReader *reader, uint8_t * archiv, struct fileTree* hea
             printf("codeLengths: %d codes: %d\n", codeLengths[i], codes[i]);
         }
         printf("decoding data\n");
-        decode_data(reader, archiv, codes, rangedData, &rangedDataSize);
+        decode_data(reader, archiv, codes, codeLengths, rangedData, &rangedDataSize);
         printf("parsing data\n");
         parseLO(rangedData, rangedDataSize, matches, &matchesSize);
         printf("writing file data\n");
