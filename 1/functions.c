@@ -535,85 +535,71 @@ void delete_tree(struct tree* head) {
     free(head);
 }
 
-
 void repeats_compression(unsigned *lengths, struct shortedLength *shorted, size_t size, size_t *shorted_count)
 {
-    unsigned dup = lengths[0];
-    size_t counter = 1, k = 0;
-    size_t repeat;
+    size_t k = 0;
+    if (size == 0) {
+        *shorted_count = 0;
+        return;
+    }
 
-    for (size_t i = 1; i < size; i++) {
-        //printf("i: %zu lengths[i]: %u dup: %u counter: %zu\n", i, lengths[i], dup, counter);
-        if (dup != 0) {
+    size_t i = 0;
+    while (i < size) {
+        unsigned val = lengths[i];
+        size_t count = 1;
+        
+        // Считаем длину текущей серии одинаковых значений
+        while (i + count < size && lengths[i + count] == val) {
+            count++;
+        }
+        
+        // Сдвигаем индекс на длину серии
+        i += count;
 
-            if (i != size - 1 && dup == lengths[i] && counter < 6)
-            {
-                counter++;
-                continue;
+        if (val == 0) {
+            // Обработка нулей (Коды 17 и 18)
+            // Код 18: 11-138 нулей
+            while (count >= 11) {
+                size_t chunk = (count > 138) ? 138 : count;
+                shorted[k].data = 18;
+                shorted[k++].extra_bits = chunk - 11;
+                count -= chunk;
             }
-            if (i == size - 1) counter++;
-            if (counter >= 3) {
-                repeat = (counter > 6) ? 6 : counter;
-                shorted[k].data = 16;
-                shorted[k++].extra_bits = repeat - 3;
-                counter = 1;
-                continue;
+            // Код 17: 3-10 нулей
+            while (count >= 3) {
+                size_t chunk = (count > 10) ? 10 : count;
+                shorted[k].data = 17;
+                shorted[k++].extra_bits = chunk - 3;
+                count -= chunk;
             }
+            // Оставшиеся нули пишем как есть
+            while (count > 0) {
+                shorted[k++].data = 0;
+                count--;
+            }
+        } else {
+            // Обработка ненулевых значений (Литерал + Код 16)
             
-        } else {
-            if (i != size - 1 && dup == lengths[i] && counter < 138) {
-                counter++;
-                continue;
-            }
-            if (i == size - 1) counter++;
-            if (counter >= 11) {
-                repeat = (counter > 138) ? 138 : counter;
-                shorted[k].data = 18;
-                shorted[k++].extra_bits = repeat - 11;
-                counter = 1;
-                dup = lengths[i];
-                continue;
-            }
-            if (counter >= 3) {
-                repeat = (counter > 10) ? 10 : counter;
-                shorted[k].data = 17;
-                shorted[k++].extra_bits = repeat - 3;
-                counter = 1;
-                dup = lengths[i];
-                continue;
-            }
-        }
-        while (counter--) shorted[k++].data = dup;
-        dup = lengths[i];
-        counter = 1;
-        
-        
-    }
+            // ВАЖНО: Код 16 копирует ПРЕДЫДУЩИЙ элемент.
+            // Поэтому сначала мы должны записать само значение один раз.
+            shorted[k++].data = val;
+            count--;
 
-    if (counter > 0) {
-        // Повторяем логику записи для хвоста массива
-        if (dup == 0) {
-            if (counter >= 11) {
-                repeat = (counter > 138) ? 138 : counter; // Внимание: тут нужна полная логика цикла для разбиения больших повторов
-                shorted[k].data = 18;
-                shorted[k++].extra_bits = repeat - 11;
-                // Если counter был > 138, тут нужен цикл while, но для простоты хвоста:
-            } else if (counter >= 3) {
-                shorted[k].data = 17;
-                shorted[k++].extra_bits = counter - 3;
-            } else {
-                while (counter--) shorted[k++].data = 0;
-            }
-        } else {
-             if (counter >= 3) { // Проверка для не-нулей
+            // Теперь используем код 16 для повторов (3-6 раз за код)
+            while (count >= 3) {
+                size_t chunk = (count > 6) ? 6 : count;
                 shorted[k].data = 16;
-                shorted[k++].extra_bits = counter - 3;
-            } else {
-                while (counter--) shorted[k++].data = dup;
+                shorted[k++].extra_bits = chunk - 3;
+                count -= chunk;
+            }
+            // Оставшиеся повторы пишем как литералы
+            while (count > 0) {
+                shorted[k++].data = val;
+                count--;
             }
         }
     }
-    (*shorted_count) = k;
+    *shorted_count = k;
 }
 
 void write_header(struct bitWriter *writer, uint8_t *buff, bool end)
