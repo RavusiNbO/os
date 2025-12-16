@@ -785,6 +785,7 @@ void compress_directory(char *filename, uint8_t *archiv, struct bitWriter *write
             memset(LLfrequencies, 0, LIT);
             memset(Ofrequencies, 0, DIST);
             count_frequencies(rangedBlock, LLfrequencies, Ofrequencies, currentBlockSize);
+            LLfrequencies[256]++;
             printf("L/L:\n");
             for (int j = 0 ; j < LIT; j++)
             {
