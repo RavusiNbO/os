@@ -70,6 +70,11 @@ void decode_trees(uint8_t *archiv, struct bitReader *reader, unsigned *codeLengt
     bool br = false;
     uint8_t extraValue = 0;
     unsigned prevValue = 0;
+    
+    // Инициализируем codeLengths нулями
+    for (size_t i = 0; i < count; i++) {
+        codeLengths[i] = 0;
+    }
 
     for (size_t i = 0; i < count; ) 
     {
@@ -89,12 +94,20 @@ void decode_trees(uint8_t *archiv, struct bitReader *reader, unsigned *codeLengt
             // Защита от зацикливания
             if (c > 16) {
                 printf("Error: Code length exceeded max limit in decode_trees. Data corrupted.\n");
+                printf("  buffer=0x%x, c=%zu, i=%zu, reader->pos=%u, reader->buffPos=%zu\n", 
+                       buffer, c, i, reader->pos, reader->buffPos);
+                // Выводим ожидаемые коды для отладки
+                for (size_t j = 0; j < 19; j++) {
+                    if (treesCodeLengths[j] != 0) {
+                        printf("  Expected: j=%zu, len=%u, code=0x%x\n", j, treesCodeLengths[j], treeCodes[j]);
+                    }
+                }
                 return; 
             }
 
             for (size_t j = 0; j < 19; j++)
             {
-                if (treesCodeLengths[j] != 0 && buffer == treeCodes[j] && c == treesCodeLengths[j])
+                if (treesCodeLengths[j] != 0 && c == treesCodeLengths[j] && buffer == treeCodes[j])
                 {
                     if (j < 16) {
                         if (i < count) {
@@ -513,11 +526,14 @@ void decompress(struct bitReader *reader, uint8_t * archiv, struct fileTree* hea
         {
             printf("treescodelengths[%d]: %u treeCodes[%d]: %u\n", i, treesCodelengths[i], i, treeCodes[i]);
         }
-        printf("decoding trees\n");
+        printf("decoding trees (reader pos before: %u, buffPos: %zu)\n", reader->pos, reader->buffPos);
         decode_trees(archiv, reader, codeLengths, treeCodes, treesCodelengths, 318);
+        printf("decoding trees done (reader pos after: %u, buffPos: %zu)\n", reader->pos, reader->buffPos);
         for (int i = 0 ; i < 318; i++)
         {
-            printf("codeLengths[%d]: %d treeCodes[%d]: %d\n", i, codeLengths[i], i, treeCodes[codeLengths[i]]);
+            if (codeLengths[i] != 0) {
+                printf("codeLengths[%d]: %d\n", i, codeLengths[i]);
+            }
         }
         printf("making canonical codes\n");
         makeCanonicalCodes(codeLengths, 318, codes);
