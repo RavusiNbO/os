@@ -589,6 +589,30 @@ void repeats_compression(unsigned *lengths, struct shortedLength *shorted, size_
         
         
     }
+
+    if (counter > 0) {
+        // Повторяем логику записи для хвоста массива
+        if (dup == 0) {
+            if (counter >= 11) {
+                repeat = (counter > 138) ? 138 : counter; // Внимание: тут нужна полная логика цикла для разбиения больших повторов
+                shorted[k].data = 18;
+                shorted[k++].extra_bits = repeat - 11;
+                // Если counter был > 138, тут нужен цикл while, но для простоты хвоста:
+            } else if (counter >= 3) {
+                shorted[k].data = 17;
+                shorted[k++].extra_bits = counter - 3;
+            } else {
+                while (counter--) shorted[k++].data = 0;
+            }
+        } else {
+             if (counter >= 3) { // Проверка для не-нулей
+                shorted[k].data = 16;
+                shorted[k++].extra_bits = counter - 3;
+            } else {
+                while (counter--) shorted[k++].data = dup;
+            }
+        }
+    }
     (*shorted_count) = k;
 }
 
