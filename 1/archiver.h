@@ -136,7 +136,7 @@ void repeats_compression(unsigned *lengths, struct shortedLength *shorted, size_
 
 void write_header(struct bitWriter *writer, uint8_t *buff, bool end);
 
-void write_lengths_of_lengths(uint16_t *codes, unsigned *lengths, struct bitWriter *writer, uint8_t *buffer);
+void write_lengths_of_lengths(unsigned *lengths, struct bitWriter *writer, uint8_t *buffer);
 
 void compress_directory(char *filename, uint8_t *archiv, struct bitWriter *writer, struct fileTree **root);
 

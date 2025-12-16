@@ -5,15 +5,22 @@
 unsigned br_read_bits(struct bitReader *r, const uint8_t *data, size_t nbits)
 {
     unsigned val = 0;
+    
     for (size_t i = 0; i < nbits; ++i) {
-        unsigned bit = (r->buff >> r->pos) & 1u; 
-        val |= (bit << i);                     
-        r->pos++;
-        if (r->pos == 8) {
-            r->pos = 0;
+        // Если нужно, загружаем новый байт
+        if (r->pos == 0) {
             r->buff = data[r->buffPos++];
         }
+        
+        
+        // Читаем текущий бит
+        unsigned bit = (r->buff >> r->pos) & 1u;
+        val |= (bit << i);
+        
+        // Переходим к следующему биту
+        r->pos = (r->pos + 1) & 7;  // Используем маску для циклического перехода 0-7
     }
+    
     return val;
 }
 
@@ -33,7 +40,7 @@ void read_file_tree(struct fileTree **head, uint8_t *archiv, struct bitReader *r
     (*head)->childsCount = archiv[reader->buffPos++];
     memcpy(&(*head)->blockCount, &(archiv[reader->buffPos]), 2);
     reader->buffPos += 2;
-    printf("%s\t%d\t%d\t%d\n", (*head)->path, (*head)->isDir, (*head)->childsCount, (*head)->blockCount);
+    printf("path: %s\tchilds: %u\tisDir: %u\tpathlen: %u\tblockCount: %u\n", (*head)->path, (*head)->childsCount, (*head)->isDir, pathlen, (*head)->blockCount);
 
     for (size_t i = 0; i < (*head)->childsCount; i++)
     {
@@ -490,7 +497,7 @@ void decompress(struct bitReader *reader, uint8_t * archiv, struct fileTree* hea
     uint8_t *fileData;
     bool end = false;
 
-    printf("isdir: %d\npath: %s\nchildsCount: %d\n", head->isDir, head->path, head->childsCount);
+    printf("isDir: %d\npath: %s\nchildsCount: %d\n", head->isDir, head->path, head->childsCount);
     if (head->isDir)
     {
         mkdir(head->path, 0777);
@@ -507,7 +514,7 @@ void decompress(struct bitReader *reader, uint8_t * archiv, struct fileTree* hea
     { 
         rangedData = calloc(2000, sizeof(struct rangedData));
         matches = calloc(2000, sizeof(struct match));
-        fileData = malloc(20000);
+        fileData = malloc(10 * 1024 * 1024);
 
         printf("reading header\n");
         bfinal = (uint8_t)br_read_bits(reader, archiv, 1);  
@@ -515,6 +522,7 @@ void decompress(struct bitReader *reader, uint8_t * archiv, struct fileTree* hea
         hlit   = (uint8_t)br_read_bits(reader, archiv, 5); 
         hdist  = (uint8_t)br_read_bits(reader, archiv, 5);  
         hclen  = (uint8_t)br_read_bits(reader, archiv, 4);  
+        printf("bfinal: %u coding: %u hlit: %u hdist: %u hclen: %u\n", bfinal, coding, hlit, hdist, hclen);
 
         printf("reading lengths\n");
         for (size_t i = 0; i < sizeof(alphabet); i++)
@@ -523,10 +531,6 @@ void decompress(struct bitReader *reader, uint8_t * archiv, struct fileTree* hea
         }
 
         
-        for (int i = 0 ; i < 19; i++)
-        {
-            printf("treescodelengths: %d\n", treesCodelengths[i]);
-        }
         makeCanonicalCodes(treesCodelengths, sizeof(alphabet), treeCodes);
         printf("making canonical codes\n");
         for (int i = 0 ; i < 19; i++)

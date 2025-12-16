@@ -3,7 +3,7 @@
 
 int main(int argc, char **argv)
 {
-    uint8_t *archiv = malloc(1024*1024*10);
+    uint8_t *archiv = malloc(1024*1024*20);
     struct bitWriter writer = {0, 0, 0};
     struct fileTree *root;
     FILE *ofile;
