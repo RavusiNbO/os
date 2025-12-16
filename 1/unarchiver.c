@@ -376,7 +376,7 @@ void parseLO(struct rangedData *rangedData, size_t rangedDataSize, struct match 
                     break;
                 case 13:
                     trueVal = 97 + rangedData[i].extraVal;
-                    break;
+                    break; 
                 case 14:
                     trueVal = 129 + rangedData[i].extraVal;
                     break;
