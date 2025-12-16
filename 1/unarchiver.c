@@ -48,6 +48,8 @@ void read_file_tree(struct fileTree **head, uint8_t *archiv, struct bitReader *r
 
 // Добавили аргумент treesCodeLengths
 // Добавили аргумент count (количество кодов для чтения)
+// unarchiver.c
+
 void decode_trees(uint8_t *archiv, struct bitReader *reader, unsigned *codeLengths, uint16_t *treeCodes, unsigned *treesCodeLengths, size_t count)
 {
     uint16_t buffer = 0;
@@ -56,24 +58,22 @@ void decode_trees(uint8_t *archiv, struct bitReader *reader, unsigned *codeLengt
     uint8_t extraValue = 0;
     unsigned prevValue = 0;
 
-    // Цикл работает пока i < count (318), а не HLIT+HDIST
     for (size_t i = 0; i < count; ) 
     {
         c = 0;
         br = false;
         buffer = 0;
         
-        // Защита от выхода за пределы массива codeLengths
         if (i >= count) break;
 
         while(!br)
         {
-            // Читаем по одному биту
-            buffer |= br_read_bits(reader, archiv, 1) << c++;
+            // ИЗМЕНЕНИЕ: Читаем бит и добавляем его в конец буфера (сдвиг влево)
+            unsigned bit = br_read_bits(reader, archiv, 1);
+            buffer = (buffer << 1) | bit;
+            c++;
             
-            // ЗАЩИТА ОТ SEGFAULT:
-            // Если длина кода превышает максимальную глубину (например, 15), 
-            // значит дерево сломано или данные битые. Прерываем, чтобы не читать память вечно.
+            // Защита от зацикливания
             if (c > 16) {
                 printf("Error: Code length exceeded max limit in decode_trees. Data corrupted.\n");
                 return; 
@@ -84,29 +84,26 @@ void decode_trees(uint8_t *archiv, struct bitReader *reader, unsigned *codeLengt
                 if (treesCodeLengths[j] != 0 && buffer == treeCodes[j] && c == treesCodeLengths[j])
                 {
                     if (j < 16) {
-                        if (i < count) { // Проверка границ
+                        if (i < count) {
                             codeLengths[i++] = j;
                             prevValue = j;
                         }
                     }
                     else if (j == 16)
                     {
+                        // Extra bits читаем стандартно LSB-first
                         extraValue = br_read_bits(reader, archiv, 2);
                         size_t repeat = 3 + extraValue;
-                        for (size_t k = 0; k < repeat; k++)
-                        {
-                            if (i < count) // Проверка границ внутри цикла повтора
-                                codeLengths[i++] = prevValue;
+                        for (size_t k = 0; k < repeat; k++) {
+                            if (i < count) codeLengths[i++] = prevValue;
                         }
                     }
                     else if (j == 17)
                     {
                         extraValue = br_read_bits(reader, archiv, 3);
                         size_t repeat = 3 + extraValue;
-                        for (size_t k = 0; k < repeat; k++)
-                        {
-                            if (i < count) // Проверка границ
-                                codeLengths[i++] = 0;
+                        for (size_t k = 0; k < repeat; k++) {
+                            if (i < count) codeLengths[i++] = 0;
                         }
                         prevValue = 0;
                     }
@@ -114,10 +111,8 @@ void decode_trees(uint8_t *archiv, struct bitReader *reader, unsigned *codeLengt
                     {
                         extraValue = br_read_bits(reader, archiv, 7);
                         size_t repeat = 11 + extraValue;
-                        for (size_t k = 0; k < repeat; k++)
-                        {
-                            if (i < count) // Проверка границ
-                                codeLengths[i++] = 0;
+                        for (size_t k = 0; k < repeat; k++) {
+                            if (i < count) codeLengths[i++] = 0;
                         }
                         prevValue = 0;
                     }
@@ -178,6 +173,7 @@ void decode_data(struct bitReader *reader, uint8_t *archiv, uint16_t *codes, uns
                     {
                         rangedData[*size].extraLen = 0;
                         rangedData[*size].extraVal = 0;
+                        
                         if (i > 264)
                         {
                             extraValue = br_read_bits(reader, archiv, 1);

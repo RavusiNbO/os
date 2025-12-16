@@ -421,31 +421,59 @@ void write_bits(struct bitWriter *writer, unsigned value, size_t nbits, uint8_t 
 }
 
 
+// Вспомогательная функция для записи кода Хаффмана (MSB first)
+void write_huffman_msb(struct bitWriter *writer, uint16_t code, unsigned bits, uint8_t *buff) {
+    for (int i = (int)bits - 1; i >= 0; --i) {
+        uint8_t bit = (code >> i) & 1u;
+        // Используем существующую механику записи битов
+        writer->buff |= (bit << writer->pos);
+        writer->pos++;
+        if (writer->pos == 8) flushBuf(buff, writer);
+    }
+}
+
 void encode_range_data(struct rangedData* data, size_t size, uint8_t *buffer, struct bitWriter *writer, uint16_t *codes, unsigned *codeLengths)
 {
-    uint16_t encoded;
-    unsigned short sizeEncoded;
-
     for (size_t i = 0 ; i < size; i++)
     {
-        uint16_t code16; unsigned codeLen16;
-        write_bits(writer, codes[data[i].haffCode], codeLengths[data[i].haffCode], buffer, data[i].extraVal, data[i].extraLen);
+        // 1. Пишем код Хаффмана MSB-first
+        write_huffman_msb(writer, codes[data[i].haffCode], codeLengths[data[i].haffCode], buffer);
+        
+        // 2. Пишем дополнительные биты (extra values) обычным способом (LSB-first)
+        if (data[i].extraLen > 0) {
+            write_bits(writer, data[i].extraVal, data[i].extraLen, buffer, 0, 0);
+        }
     }
-    write_bits(writer, 256, 9, buffer, 0, 0);
+    // Пишем код конца блока (256) MSB-first
+    write_huffman_msb(writer, codes[256], codeLengths[256], buffer);
 }
 
 
+// functions.c
+
+
+
 void encode_lengths(struct shortedLength *shortedLengths, size_t count, uint16_t *tree_codes, unsigned *tree_code_lens, uint8_t *buffer, struct bitWriter *writer) {
-    write_bits(writer, count, sizeof(count), buffer, 0, 0);
+    // УДАЛЕНО: write_bits(writer, count, sizeof(count), buffer, 0, 0); 
+    // Разархиватор не ждет count, он читает пока не заполнит 318 длин.
+
     for (size_t i = 0; i < count; ++i) {
         uint8_t sym = shortedLengths[i].data;
         uint16_t code = tree_codes[sym];
         uint8_t clen = tree_code_lens[sym];
-        if (sym == 16) write_bits(writer, code, clen , buffer, shortedLengths[i].extra_bits, 2);
-        else if (sym == 17) write_bits(writer, code, clen, buffer, shortedLengths[i].extra_bits, 3);
-        else if (sym == 18) write_bits(writer, code, clen, buffer, shortedLengths[i].extra_bits, 7);
-        else{
-            write_bits(writer, code, clen, buffer, 0, 0);
+
+        // 1. Пишем сам код Хаффмана MSB-first
+        write_huffman_msb(writer, code, clen, buffer);
+
+        // 2. Пишем extra bits (если есть) LSB-first (как обычно)
+        if (sym == 16) {
+            write_bits(writer, shortedLengths[i].extra_bits, 2, buffer, 0, 0);
+        }
+        else if (sym == 17) {
+            write_bits(writer, shortedLengths[i].extra_bits, 3, buffer, 0, 0);
+        }
+        else if (sym == 18) {
+            write_bits(writer, shortedLengths[i].extra_bits, 7, buffer, 0, 0);
         }
     }
 }
