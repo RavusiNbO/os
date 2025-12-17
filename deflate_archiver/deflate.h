@@ -10,11 +10,9 @@
 #define MIN_MATCH 3
 #define MAX_MATCH 258
 #define MAX_BITS 15
-#define LITERAL_CODES 256
+#define LITERAL_CODES 286 // 0-255 literals, 256 EOB, 257-285 length codes
+#define DISTANCE_CODES 30 // 0-29 distance codes
 #define END_OF_BLOCK 256
-#define LENGTH_CODES 29
-#define DISTANCE_CODES 30
-#define CODE_TABLE_SIZE (LITERAL_CODES + LENGTH_CODES + DISTANCE_CODES)
 
 // Структуры для работы с битами
 typedef struct {
@@ -77,7 +75,12 @@ uint8_t* lz77_decompress(const LZ77Token *tokens, size_t token_count, size_t *ou
 HuffmanNode* huffman_build_tree(uint32_t *frequencies, size_t count);
 void huffman_get_codes(HuffmanNode *root, HuffmanCode *codes, uint16_t code, uint8_t length);
 void huffman_free_tree(HuffmanNode *root);
-void huffman_canonical_codes(uint8_t *lengths, size_t count, uint16_t *codes);
+// Генерирует коды на основе длин (для энкодера)
+void huffman_canonical_codes(uint8_t *lengths, size_t count, HuffmanCode *codes);
+// Строит дерево декодирования на основе длин (для декодера)
+HuffmanNode* huffman_rebuild_tree(const uint8_t *lengths, size_t count);
+// Читает символ, используя дерево
+int huffman_decode_symbol(BitReader *reader, HuffmanNode *root);
 
 // Функции deflate
 int deflate_compress(const uint8_t *input, size_t input_size, uint8_t *output, size_t *output_size);
@@ -88,4 +91,3 @@ int archive_directory(const char *dir_path, const char *archive_path);
 int extract_archive(const char *archive_path, const char *output_dir);
 
 #endif // DEFLATE_H
-

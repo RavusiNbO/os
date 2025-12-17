@@ -91,6 +91,15 @@ void decode_trees(uint8_t *archiv, struct bitReader *reader, unsigned *codeLengt
             buffer = (buffer << 1) | bit;
             c++;
             
+            // Отладочный вывод для первых нескольких битов
+            if (i < 5 && c <= 4) {
+                printf("  [i=%zu] Read bit %u, buffer=0x%x (binary: ", i, bit, buffer);
+                for (int k = (int)c - 1; k >= 0; k--) {
+                    printf("%d", (buffer >> k) & 1);
+                }
+                printf("), c=%zu, pos=%u\n", c, reader->pos);
+            }
+            
             // Защита от зацикливания
             if (c > 16) {
                 printf("Error: Code length exceeded max limit in decode_trees. Data corrupted.\n");
@@ -527,6 +536,17 @@ void decompress(struct bitReader *reader, uint8_t * archiv, struct fileTree* hea
             printf("treescodelengths[%d]: %u treeCodes[%d]: %u\n", i, treesCodelengths[i], i, treeCodes[i]);
         }
         printf("decoding trees (reader pos before: %u, buffPos: %zu)\n", reader->pos, reader->buffPos);
+        // Выводим ожидаемые коды для отладки
+        printf("Expected codes:\n");
+        for (size_t j = 0; j < 19; j++) {
+            if (treesCodelengths[j] != 0) {
+                printf("  j=%zu, len=%u, code=0x%x (binary: ", j, treesCodelengths[j], treeCodes[j]);
+                for (int k = (int)treesCodelengths[j] - 1; k >= 0; k--) {
+                    printf("%d", (treeCodes[j] >> k) & 1);
+                }
+                printf(")\n");
+            }
+        }
         decode_trees(archiv, reader, codeLengths, treeCodes, treesCodelengths, 318);
         printf("decoding trees done (reader pos after: %u, buffPos: %zu)\n", reader->pos, reader->buffPos);
         for (int i = 0 ; i < 318; i++)
