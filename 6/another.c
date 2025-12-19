@@ -12,13 +12,11 @@ int main(int argc, char *argv[]) {
         return 1;
     }
     
-    // Проверяем существование файла
     if (access(argv[1], F_OK) != 0) {
         perror("File not found");
         return 1;
     }
     
-    // Получаем абсолютный путь
     char abs_path[PATH_MAX];
     if (realpath(argv[1], abs_path) == NULL) {
         perror("Cannot get absolute path");
@@ -54,7 +52,7 @@ int main(int argc, char *argv[]) {
     
     // Создаем D-Bus сообщение для вызова метода openUrl
     msg = dbus_message_new_method_call(
-        "org.kde.kate-5671",          // имя службы (service name)
+        "org.kde.kate-2508",          // имя службы (service name)
         "/MainApplication",            // путь к объекту (object path)
         "org.kde.Kate.Application",    // интерфейс (interface)
         "openUrl"                      // имя метода (method)
@@ -125,8 +123,6 @@ int main(int argc, char *argv[]) {
         const char *error_name = dbus_message_get_error_name(reply);
         fprintf(stderr, "Kate returned error: %s\n", error_name ? error_name : "Unknown");
     }
-    
-    // Освобождаем ресурсы
     dbus_message_unref(reply);
     dbus_message_unref(msg);
     dbus_connection_unref(conn);
